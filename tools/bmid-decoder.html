@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BMID Decoder</title>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1f2328; line-height: 1.55; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin-top: 36px; margin-bottom: 8px; }
+  p { margin: 8px 0; }
+  code, pre, input, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 14px 16px; overflow-x: auto; border-radius: 6px; border: 1px solid #e5e7eb; }
+  a.bookmarklet { display: inline-block; padding: 9px 16px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; user-select: none; }
+  a.bookmarklet:hover { background: #1d4ed8; }
+  .try-it { display: flex; gap: 8px; margin: 12px 0; }
+  .try-it input { flex: 1; padding: 8px 10px; border: 1px solid #d0d7de; border-radius: 6px; }
+  .try-it button { padding: 8px 18px; background: #2563eb; color: white; border: 0; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .try-it button:hover { background: #1d4ed8; }
+  table.bmid { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  table.bmid td { padding: 5px 14px 5px 0; border-bottom: 1px solid #eaecef; }
+  table.bmid td.k { opacity: 0.55; width: 110px; white-space: nowrap; }
+  table.bmid td.v { word-break: break-all; }
+  .ok { color: #1a7f37; font-weight: 600; }
+  .fail { color: #cf222e; font-weight: 600; }
+  .hint { opacity: 0.6; font-size: 13px; }
+  .err { color: #cf222e; font-family: monospace; font-size: 13px; padding: 10px 14px; background: #fff0f0; border: 1px solid #ffd0d0; border-radius: 6px; }
+  .canon { opacity: 0.6; word-break: break-all; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<h1>BMID Decoder</h1>
+<p>Decode a Book Metadata Identifier — show its fields, validate the CRC, extract the UUIDv7 mint timestamp.</p>
+
+<h2>Bookmarklet</h2>
+<p>Drag this link to your bookmark bar:</p>
+<p><a id="bookmarklet" class="bookmarklet" href="#">BMID Decoder</a></p>
+<p class="hint">Once installed, click the bookmarklet on any page. If you have a BMID selected, it parses that; otherwise it prompts. Results appear as an overlay in the top-right of the page. Accepts the canonical 40-character form, the <code>urn:bmid:</code> prefix, mixed case, and Crockford <code>I/L/O</code> aliases.</p>
+
+<h2>Try it here</h2>
+<div class="try-it">
+  <input id="input" type="text" placeholder="041ZY080000033SD9A600W93K8NKRKAYDXX8PHR4" autocomplete="off" spellcheck="false">
+  <button id="go">Decode</button>
+</div>
+<div id="result"></div>
+
+<h2>Source</h2>
+<p>The bookmarklet is a single self-contained IIFE. Readable form:</p>
+<pre><code id="src"></code></pre>
+
+<script>
+"use strict";
+
+const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
+const ENVS  = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
+
+function normalize(s) {
+  return s.replace(/^urn:bmid:/i, "")
+          .replace(/\s+/g, "")
+          .toUpperCase()
+          .replace(/[IL]/g, "1")
+          .replace(/O/g, "0");
+}
+
+function decode(s) {
+  const inv = {};
+  for (let i = 0; i < 32; i++) inv[ALPHA[i]] = i;
+  let bits = 0, val = 0, out = [];
+  for (const ch of s) {
+    if (!(ch in inv)) throw new Error("invalid character: " + ch);
+    val = (val << 5) | inv[ch];
+    bits += 5;
+    if (bits >= 8) { bits -= 8; out.push((val >> bits) & 0xFF); }
+  }
+  return out;
+}
+
+function crc16xmodem(arr) {
+  let crc = 0;
+  for (const b of arr) {
+    crc ^= b << 8;
+    for (let i = 0; i < 8; i++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xFFFF;
+    }
+  }
+  return crc;
+}
+
+const hex = (n, w) => n.toString(16).toUpperCase().padStart(w, "0");
+
+function parseBmid(input) {
+  const canon = normalize(input);
+  if (canon.length !== 40) throw new Error("length " + canon.length + ", expected 40");
+  const bytes = decode(canon);
+  if (bytes.length !== 25) throw new Error("decoded " + bytes.length + " bytes, expected 25");
+  const storedCrc = (bytes[23] << 8) | bytes[24];
+  const computed = crc16xmodem(bytes.slice(0, 23));
+  let ts = 0;
+  for (let i = 0; i < 6; i++) ts = ts * 256 + bytes[7 + i];
+  const uuid = bytes.slice(7, 23).map(b => hex(b, 2)).join("")
+                    .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+  return {
+    canon, bytes,
+    version: bytes[0],
+    entityType: bytes[1],
+    vendor: bytes[2],
+    environment: bytes[3],
+    reserved: bytes.slice(4, 7),
+    uuid, mintedAt: new Date(ts),
+    storedCrc, computedCrc: computed, crcOk: storedCrc === computed
+  };
+}
+
+function vendorLabel(v) {
+  if (v === 0x00) return " (invalid)";
+  if (v === 0xFF) return " (testing)";
+  return "";
+}
+
+function renderTable(p) {
+  const ok = p.crcOk;
+  return `
+    <div class="canon mono">${p.canon}</div>
+    <table class="bmid">
+      <tr><td class="k">Version</td><td class="v mono">0x${hex(p.version, 2)} (v${p.version})</td></tr>
+      <tr><td class="k">Entity</td><td class="v mono">0x${hex(p.entityType, 2)} ${TYPES[p.entityType] || "unknown"}</td></tr>
+      <tr><td class="k">Vendor</td><td class="v mono">0x${hex(p.vendor, 2)}${vendorLabel(p.vendor)}</td></tr>
+      <tr><td class="k">Env</td><td class="v mono">0x${hex(p.environment, 2)} ${ENVS[p.environment] || "unknown"}</td></tr>
+      <tr><td class="k">Reserved</td><td class="v mono">${[...p.reserved].map(b => hex(b, 2)).join(" ")}</td></tr>
+      <tr><td class="k">UUIDv7</td><td class="v mono">${p.uuid}</td></tr>
+      <tr><td class="k">Minted</td><td class="v mono">${p.mintedAt.toISOString()}</td></tr>
+      <tr><td class="k">CRC</td><td class="v mono"><span class="${ok ? 'ok' : 'fail'}">0x${hex(p.storedCrc, 4)} ${ok ? 'OK' : 'FAIL (computed 0x' + hex(p.computedCrc, 4) + ')'}</span></td></tr>
+    </table>
+  `;
+}
+
+const resultDiv = document.getElementById("result");
+const inputEl = document.getElementById("input");
+const goBtn = document.getElementById("go");
+
+function runDecode() {
+  const v = inputEl.value.trim();
+  if (!v) { resultDiv.innerHTML = ""; return; }
+  try {
+    resultDiv.innerHTML = renderTable(parseBmid(v));
+  } catch (e) {
+    resultDiv.innerHTML = `<div class="err">${e.message}</div>`;
+  }
+}
+
+goBtn.addEventListener("click", runDecode);
+inputEl.addEventListener("keydown", e => { if (e.key === "Enter") runDecode(); });
+
+// ---------- Bookmarklet wiring ----------
+
+const bookmarkletSource = `(function () {
+  const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
+  const ENVS  = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
+
+  function normalize(s) {
+    return s.replace(/^urn:bmid:/i, "")
+            .replace(/\\s+/g, "")
+            .toUpperCase()
+            .replace(/[IL]/g, "1")
+            .replace(/O/g, "0");
+  }
+
+  function decode(s) {
+    const inv = {};
+    for (let i = 0; i < 32; i++) inv[ALPHA[i]] = i;
+    let bits = 0, val = 0, out = [];
+    for (const ch of s) {
+      if (!(ch in inv)) throw new Error("invalid character: " + ch);
+      val = (val << 5) | inv[ch];
+      bits += 5;
+      if (bits >= 8) { bits -= 8; out.push((val >> bits) & 0xFF); }
+    }
+    return out;
+  }
+
+  function crc16xmodem(arr) {
+    let crc = 0;
+    for (const b of arr) {
+      crc ^= b << 8;
+      for (let i = 0; i < 8; i++) {
+        crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xFFFF;
+      }
+    }
+    return crc;
+  }
+
+  const hex = (n, w) => n.toString(16).toUpperCase().padStart(w, "0");
+
+  const sel = ((window.getSelection && window.getSelection().toString()) || "").trim();
+  const input = sel || prompt("Paste a BMID:");
+  if (!input) return;
+
+  let canon, bytes;
+  try {
+    canon = normalize(input);
+    if (canon.length !== 40) throw new Error("length " + canon.length + ", expected 40");
+    bytes = decode(canon);
+  } catch (e) {
+    alert("BMID parse error: " + e.message);
+    return;
+  }
+
+  const storedCrc = (bytes[23] << 8) | bytes[24];
+  const computed = crc16xmodem(bytes.slice(0, 23));
+  const ok = storedCrc === computed;
+
+  let ts = 0;
+  for (let i = 0; i < 6; i++) ts = ts * 256 + bytes[7 + i];
+
+  const uuid = bytes.slice(7, 23).map(b => hex(b, 2)).join("")
+                    .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+
+  const vendorLabel = bytes[2] === 0xFF ? " (testing)" : bytes[2] === 0x00 ? " (invalid)" : "";
+
+  const row = (k, v) => '<tr><td style="padding:2px 14px 2px 0;opacity:.55">' + k + '</td><td>' + v + '</td></tr>';
+
+  const html =
+    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.5">' +
+      '<div style="font-weight:600;font-size:14px;margin-bottom:6px">BMID</div>' +
+      '<div style="word-break:break-all;margin-bottom:10px;opacity:.7">' + canon + '</div>' +
+      '<table style="border-collapse:collapse">' +
+        row("Version",  '0x' + hex(bytes[0], 2) + ' (v' + bytes[0] + ')') +
+        row("Entity",   '0x' + hex(bytes[1], 2) + ' ' + (TYPES[bytes[1]] || 'unknown')) +
+        row("Vendor",   '0x' + hex(bytes[2], 2) + vendorLabel) +
+        row("Env",      '0x' + hex(bytes[3], 2) + ' ' + (ENVS[bytes[3]] || 'unknown')) +
+        row("Reserved", bytes.slice(4, 7).map(b => hex(b, 2)).join(' ')) +
+        row("UUIDv7",   uuid) +
+        row("Minted",   new Date(ts).toISOString()) +
+        row("CRC",      '<span style="color:' + (ok ? '#0a0' : '#c00') + '">0x' + hex(storedCrc, 4) + ' ' + (ok ? 'OK' : 'FAIL (computed 0x' + hex(computed, 4) + ')') + '</span>') +
+      '</table>' +
+      '<div style="margin-top:10px;font-size:11px;opacity:.5">click to dismiss</div>' +
+    '</div>';
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;top:20px;right:20px;background:#fff;color:#222;border:1px solid #ccc;border-radius:8px;padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:2147483647;max-width:520px;cursor:pointer";
+  overlay.innerHTML = html;
+  overlay.onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+})();`;
+
+// URL-encode the source so that newlines and special chars are preserved exactly
+// when the browser stores the bookmark and decodes it for execution.
+const bookmarkletURL = "javascript:" + encodeURIComponent(bookmarkletSource) + "void(0);";
+
+document.getElementById("bookmarklet").href = bookmarkletURL;
+document.getElementById("src").textContent = bookmarkletSource;
+</script>
+
+</body>
+</html>
