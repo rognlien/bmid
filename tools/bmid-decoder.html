@@ -30,12 +30,12 @@
 <body>
 
 <h1>BMID Decoder</h1>
-<p>Decode a Book Metadata Identifier — show its fields, validate the CRC, extract the UUIDv7 mint timestamp.</p>
+<p>Decode a Book Metadata Identifier — show its fields, validate the CRC, and extract the mint timestamp when the payload is a UUIDv7.</p>
 
 <h2>Bookmarklet</h2>
 <p>Drag this link to your bookmark bar:</p>
 <p><a id="bookmarklet" class="bookmarklet" href="#">BMID Decoder</a></p>
-<p class="hint">Once installed, click the bookmarklet on any page. If you have a BMID selected, it parses that; otherwise it prompts. Results appear as an overlay in the top-right of the page. Accepts the canonical 40-character form, the <code>urn:bmid:</code> prefix, mixed case, and Crockford <code>I/L/O</code> aliases.</p>
+<p class="hint">Once installed, click the bookmarklet on any page. If you have a BMID selected, it parses that; otherwise it prompts. Results appear as an overlay in the top-right of the page. Accepts the canonical 40-character form, the <code>urn:bmid:</code> prefix, hyphens, mixed case, and Crockford <code>I/L/O</code> aliases.</p>
 
 <h2>Try it here</h2>
 <div class="try-it">
@@ -55,9 +55,13 @@ const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
 const ENVS  = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
 
+// Spec "Input Normalization": trim outer whitespace, strip hyphens, fold case,
+// map I/L to 1 and O to 0. Interior whitespace is NOT stripped — it falls
+// through to the charset check and is rejected there.
 function normalize(s) {
-  return s.replace(/^urn:bmid:/i, "")
-          .replace(/\s+/g, "")
+  return s.trim()
+          .replace(/^urn:bmid:/i, "")
+          .replace(/-/g, "")
           .toUpperCase()
           .replace(/[IL]/g, "1")
           .replace(/O/g, "0");
@@ -97,8 +101,17 @@ function parseBmid(input) {
   if (bytes.length !== 25) throw new Error("decoded " + bytes.length + " bytes, expected 25");
   const storedCrc = (bytes[23] << 8) | bytes[24];
   const computed = crc16xmodem(bytes.slice(0, 23));
-  let ts = 0;
-  for (let i = 0; i < 6; i++) ts = ts * 256 + bytes[7 + i];
+  // Spec validation step 7: variant bits must be 10, version nibble 0x1-0x8.
+  const uuidVersion = bytes[13] >> 4;
+  const variantOk = (bytes[15] & 0xC0) === 0x80;
+  const uuidOk = variantOk && uuidVersion >= 1 && uuidVersion <= 8;
+  const isV7 = variantOk && uuidVersion === 7;
+  let mintedAt = null;
+  if (isV7) {
+    let ts = 0;
+    for (let i = 0; i < 6; i++) ts = ts * 256 + bytes[7 + i];
+    mintedAt = new Date(ts);
+  }
   const uuid = bytes.slice(7, 23).map(b => hex(b, 2)).join("")
                     .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
   return {
@@ -108,7 +121,7 @@ function parseBmid(input) {
     vendor: bytes[2],
     environment: bytes[3],
     reserved: bytes.slice(4, 7),
-    uuid, mintedAt: new Date(ts),
+    uuid, uuidVersion, uuidOk, isV7, mintedAt,
     storedCrc, computedCrc: computed, crcOk: storedCrc === computed
   };
 }
@@ -128,9 +141,9 @@ function renderTable(p) {
       <tr><td class="k">Entity</td><td class="v mono">0x${hex(p.entityType, 2)} ${TYPES[p.entityType] || "unknown"}</td></tr>
       <tr><td class="k">Vendor</td><td class="v mono">0x${hex(p.vendor, 2)}${vendorLabel(p.vendor)}</td></tr>
       <tr><td class="k">Env</td><td class="v mono">0x${hex(p.environment, 2)} ${ENVS[p.environment] || "unknown"}</td></tr>
-      <tr><td class="k">Reserved</td><td class="v mono">${[...p.reserved].map(b => hex(b, 2)).join(" ")}</td></tr>
-      <tr><td class="k">UUIDv7</td><td class="v mono">${p.uuid}</td></tr>
-      <tr><td class="k">Minted</td><td class="v mono">${p.mintedAt.toISOString()}</td></tr>
+      <tr><td class="k">Reserved</td><td class="v mono">${[...p.reserved].map(b => hex(b, 2)).join(" ")}${p.reserved.some(b => b !== 0) ? ' <span class="fail">(must be zero in v1)</span>' : ''}</td></tr>
+      <tr><td class="k">UUID</td><td class="v mono">${p.uuid} ${p.uuidOk ? '<span class="hint">(v' + p.uuidVersion + ')</span>' : '<span class="fail">invalid RFC 9562 version/variant</span>'}</td></tr>
+      <tr><td class="k">Minted</td><td class="v mono">${p.isV7 ? p.mintedAt.toISOString() : '<span class="hint">n/a — payload is not a UUIDv7</span>'}</td></tr>
       <tr><td class="k">CRC</td><td class="v mono"><span class="${ok ? 'ok' : 'fail'}">0x${hex(p.storedCrc, 4)} ${ok ? 'OK' : 'FAIL (computed 0x' + hex(p.computedCrc, 4) + ')'}</span></td></tr>
     </table>
   `;
@@ -161,8 +174,9 @@ const bookmarkletSource = `(function () {
   const ENVS  = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
 
   function normalize(s) {
-    return s.replace(/^urn:bmid:/i, "")
-            .replace(/\\s+/g, "")
+    return s.trim()
+            .replace(/^urn:bmid:/i, "")
+            .replace(/-/g, "")
             .toUpperCase()
             .replace(/[IL]/g, "1")
             .replace(/O/g, "0");
@@ -213,8 +227,16 @@ const bookmarkletSource = `(function () {
   const computed = crc16xmodem(bytes.slice(0, 23));
   const ok = storedCrc === computed;
 
-  let ts = 0;
-  for (let i = 0; i < 6; i++) ts = ts * 256 + bytes[7 + i];
+  const uuidVersion = bytes[13] >> 4;
+  const variantOk = (bytes[15] & 0xC0) === 0x80;
+  const uuidOk = variantOk && uuidVersion >= 1 && uuidVersion <= 8;
+  const isV7 = variantOk && uuidVersion === 7;
+  let minted = 'n/a &mdash; payload is not a UUIDv7';
+  if (isV7) {
+    let ts = 0;
+    for (let i = 0; i < 6; i++) ts = ts * 256 + bytes[7 + i];
+    minted = new Date(ts).toISOString();
+  }
 
   const uuid = bytes.slice(7, 23).map(b => hex(b, 2)).join("")
                     .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
@@ -232,9 +254,9 @@ const bookmarkletSource = `(function () {
         row("Entity",   '0x' + hex(bytes[1], 2) + ' ' + (TYPES[bytes[1]] || 'unknown')) +
         row("Vendor",   '0x' + hex(bytes[2], 2) + vendorLabel) +
         row("Env",      '0x' + hex(bytes[3], 2) + ' ' + (ENVS[bytes[3]] || 'unknown')) +
-        row("Reserved", bytes.slice(4, 7).map(b => hex(b, 2)).join(' ')) +
-        row("UUIDv7",   uuid) +
-        row("Minted",   new Date(ts).toISOString()) +
+        row("Reserved", bytes.slice(4, 7).map(b => hex(b, 2)).join(' ') + (bytes.slice(4, 7).some(b => b !== 0) ? ' <span style="color:#c00">(must be zero in v1)</span>' : '')) +
+        row("UUID",     uuid + ' <span style="color:' + (uuidOk ? '#888' : '#c00') + '">' + (uuidOk ? '(v' + uuidVersion + ')' : 'invalid RFC 9562 version/variant') + '</span>') +
+        row("Minted",   minted) +
         row("CRC",      '<span style="color:' + (ok ? '#0a0' : '#c00') + '">0x' + hex(storedCrc, 4) + ' ' + (ok ? 'OK' : 'FAIL (computed 0x' + hex(computed, 4) + ')') + '</span>') +
       '</table>' +
       '<div style="margin-top:10px;font-size:11px;opacity:.5">click to dismiss</div>' +
