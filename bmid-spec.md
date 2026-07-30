@@ -183,7 +183,7 @@ The CRC provides:
 
 ### UUID Payload
 
-The 16-byte payload is a **UUIDv7** (RFC 9562). UUIDv7 is mandatory in BMID v1, for the following reasons:
+The 16-byte payload is a **UUIDv7** (RFC 9562). UUIDv7 is mandatory in BMID v1, and validators enforce it: a BMID whose payload does not carry the UUIDv7 version and variant bits is invalid (see *Validation*, step 7). It is mandatory for the following reasons:
 
 - The embedded millisecond timestamp enables temporal ordering and time-range queries directly from the identifier
 - K-sortable insertion order substantially improves B-tree and index locality compared to random UUIDv4
@@ -266,6 +266,7 @@ A conforming implementation must validate the following on input, in this order:
 4. **Version:** the version byte must be a recognized version. Unknown versions should be rejected or routed to a version-aware handler.
 5. **Entity type, vendor ID, environment:** codes should be within known ranges. Unknown codes may be accepted with a warning to support forward compatibility with newly-registered values.
 6. **Reserved bytes:** in version 1, bytes 4–6 should be zero. Non-zero reserved bytes from a v1 producer indicate a bug or corruption; consumers may accept and ignore them for forward compatibility.
+7. **UUID version and variant:** the high nibble of byte 13 of the decoded array (byte 6 of the UUID payload) must be `0x7`, and the two most significant bits of byte 15 (byte 8 of the payload) must be `10` (the RFC 9562 variant). Inputs failing this check must be rejected in version 1 — the temporal-ordering and index-locality guarantees hold only if the payload is actually a UUIDv7.
 
 The CRC algorithm is fixed across all versions of the specification, so step 3 never depends on step 4.
 
