@@ -8,7 +8,7 @@ Specification-only. The only substantive file is `bmid-spec.md` (the BMID v1.0 d
 
 ## What BMID is
 
-A **Book Metadata Identifier**: a 25-byte (200-bit) structured identifier that wraps a UUIDv7 with routing and integrity metadata, encoded as 40 Crockford Base32 characters. Designed for IFLA LRM entities (Work, Expression, Manifestation, Item, Agent, Series, Subject) in a coordinated consortium of partner organizations.
+A **Book Metadata Identifier**: a 25-byte (200-bit) structured identifier that wraps a UUID (UUIDv7 recommended for new mints) with routing and integrity metadata, encoded as 40 Crockford Base32 characters. Designed for IFLA LRM entities (Work, Expression, Manifestation, Item, Agent, Series, Subject) in a coordinated consortium of partner organizations.
 
 The key framing to preserve in any writing or code: **a BMID is not a replacement for UUID — it contains a UUID.** It is a thin, fixed-cost envelope that adds routing, provenance, environment awareness, and integrity.
 
@@ -27,7 +27,7 @@ Any implementation or spec edit must respect these — they are the points where
   | 2 | Vendor ID | 1 byte |
   | 3 | Environment | 1 byte |
   | 4–6 | Reserved (must be zero in v1) | 3 bytes |
-  | 7–22 | UUIDv7 payload | 16 bytes |
+  | 7–22 | UUID payload (RFC 9562) | 16 bytes |
   | 23–24 | CRC-16/XMODEM, big-endian | 2 bytes |
 
   Total: 25 bytes / 40 Crockford Base32 characters.
@@ -36,10 +36,10 @@ Any implementation or spec edit must respect these — they are the points where
 - **The CRC algorithm is invariant across all BMID versions.** Future version bumps may change anything else, but never the CRC. This is what lets validation compute CRC before reading the version byte.
 - **Crockford Base32 exclusively** (excludes I, L, O, U). Case-insensitive on input. Canonical form is uppercase. 5 bits/char × 40 chars = 200 bits with no padding.
 - **No hyphens, no separators, no segmented display form.** Canonical = 40 unbroken uppercase chars. URN form `urn:bmid:<40-char-id>` is optional but supported. Input normalization is mandatory and fixed: strip outer whitespace, strip hyphens, uppercase, map I/L→1 and O→0 — then reject anything outside the alphabet.
-- **UUIDv7 is mandatory.** Not v4. Mandating v7 is what makes temporal ordering and index locality real BMID guarantees rather than incidental.
+- **The payload is any valid RFC 9562 UUID; UUIDv7 is the recommended default for new mints.** Pre-existing UUIDs (e.g. v4) are wrapped verbatim into the payload — deterministically, original recoverable from bytes 7–22 — so temporal ordering is a *conditional* guarantee: consumers check the version nibble before relying on it. Wrap-once rule: the partner owning the legacy record mints the wrap; the vendor byte is the wrapping organization.
 - **Parse fields from the decoded byte array, not from character offsets in the string.** Field boundaries do not align with Base32 character boundaries.
 - **Canonical string sort order equals binary byte order.** The Crockford alphabet is ASCII-ordered, so lexicographic sort of canonical forms preserves prefix grouping and UUIDv7 k-sorting. Don't introduce any encoding or display form that breaks this.
-- **Validation order**: length → charset → CRC → version → field codes → reserved-bytes-zero check → UUID version/variant check (high nibble of byte 13 must be `0x7`, top two bits of byte 15 must be `10`).
+- **Validation order**: length → charset → CRC → version → field codes → reserved-bytes-zero check → UUID structural check (top two bits of byte 15 must be `10`; high nibble of byte 13 must be a defined RFC 9562 version, `0x1`–`0x8` — not necessarily 7).
 
 ## Registries
 
