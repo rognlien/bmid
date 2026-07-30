@@ -10,7 +10,7 @@ Specification-only. The only substantive file is `bmid-spec.md` (the BMID v1.0 d
 
 A **Book Metadata Identifier**: a 25-byte (200-bit) structured identifier that wraps a UUID (UUIDv7 recommended for new mints) with routing and integrity metadata, encoded as 40 Crockford Base32 characters. Designed for IFLA LRM entities (Work, Expression, Manifestation, Item, Agent, Series, Subject) in a coordinated consortium of partner organizations.
 
-The key framing to preserve in any writing or code: **a BMID is not a replacement for UUID — it contains a UUID.** It is a thin, fixed-cost envelope that adds routing, provenance, partition awareness, and integrity.
+The key framing to preserve in any writing or code: **a BMID is not a replacement for UUID — it contains a UUID.** It is a thin, fixed-cost envelope that adds routing, provenance, and integrity.
 
 BMID is for entities that lack standard identifiers (Work, Manifestation, Contributor, Series, etc.). It is **not** a replacement for ISBN, ISTC, ISNI, or DOI — those continue to be carried as parallel metadata.
 
@@ -25,8 +25,7 @@ Any implementation or spec edit must respect these — they are the points where
   | 0 | Version | 1 byte |
   | 1 | Entity Type | 1 byte |
   | 2 | Vendor ID | 1 byte |
-  | 3 | Partition | 1 byte |
-  | 4–6 | Reserved (must be zero in v1) | 3 bytes |
+  | 3–6 | Reserved (must be zero in v1) | 4 bytes |
   | 7–22 | UUID payload (RFC 9562) | 16 bytes |
   | 23–24 | CRC-16/XMODEM, big-endian | 2 bytes |
 
@@ -47,20 +46,20 @@ All allocations are made by submitting a PR against `bmid-spec.md`. There is no 
 
 - **Entity Type** (1 byte): `0x01–0x07` core LRM (Work, Expression, Manifestation, Item, Agent, Series, Subject); `0x08–0x7F` reserved for future LRM/IFLA-aligned types; `0x80–0xFE` available for registry-assigned extensions; `0x00` and `0xFF` reserved.
 - **Vendor ID** (1 byte): `0x01–0xFE` available for assignment to partner organizations; `0x00` invalid; `0xFF` reserved for testing/examples. No allocations in the current draft.
-- **Partition** (1 byte): `0x01` Production (default), `0x02` Staging, `0x03` Development, `0x04` Test; `0x05–0x0F` reserved common codes; `0x10–0xFE` vendor-defined routing partitions (scoped by the vendor byte, append-only per vendor); `0x00` and `0xFF` reserved.
 
 ## Editing the spec
 
 - The spec is a **DRAFT v1.0**. Changes to byte layout, field sizes, the CRC algorithm, or the mandatory UUID version are breaking and should prompt a version-byte discussion rather than silent edits.
 - The vendor ID identifies the **minter at mint time** — it is provenance, not current custody. Custody belongs in mutable metadata. Don't conflate them in spec edits.
-- The partition byte (environment codes and vendor-defined routing alike) is **diagnostic and routing, not security**. Don't reframe it as a defense or boundary enforcement mechanism. Network/credential isolation is the real boundary.
+- There is **no environment or partition field**. That was tried and deliberately removed: it either carried no information (single-environment partners) or baked unstable operational structure into permanent identifiers. Don't reintroduce it without a version-byte discussion; the reserved bytes are the place such a field would go.
 - Keep the two storage forms distinct in any discussion: binary (25 bytes) and canonical Base32 (40 chars). There is no third form.
 - BMIDs are **never reused or reassigned.** Deprecation is handled via a separate metadata field pointing to a successor BMID.
 - The "Comparison with Plain UUIDs" and "Why a Structured Identifier" sections are the rhetorical core — edits there change the spec's pitch, not just its prose.
 
 ## Worked example (for sanity-checking implementations)
 
-Canonical: `041ZY080000033SD9A600W93K8NKRKAYDXX8PHR4`
-Decoded (hex): `01 03 FF 01 00 00 00 01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B 47 04`
-CRC: `0x4704`
-Decoded fields: version=1, entity_type=Manifestation (0x03), vendor=testing (0xFF), partition=Production (0x01).
+Canonical: `041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ`
+Decoded (hex): `01 03 FF 00 00 00 00 01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B 72 B7`
+CRC: `0x72B7`
+Decoded fields: version=1, entity_type=Manifestation (0x03), vendor=testing (0xFF).
+Wrapped-v4 example: `042ZY000000F8YP11DCCRGVJMNKGW0NJRFA7JRJ4` (Agent 0x05, vendor 0xFF, payload `f47ac10b-58cc-4372-a567-0e02b2c3d479`, CRC `0x6244`).
