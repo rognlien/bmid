@@ -38,6 +38,7 @@ Any implementation or spec edit must respect these — they are the points where
 - **No hyphens, no separators, no segmented display form.** Canonical = 40 unbroken uppercase chars. URN form `urn:bmid:<40-char-id>` is optional but supported. Input normalization is mandatory and fixed: strip outer whitespace, strip hyphens, uppercase, map I/L→1 and O→0 — then reject anything outside the alphabet.
 - **UUIDv7 is mandatory.** Not v4. Mandating v7 is what makes temporal ordering and index locality real BMID guarantees rather than incidental.
 - **Parse fields from the decoded byte array, not from character offsets in the string.** Field boundaries do not align with Base32 character boundaries.
+- **Canonical string sort order equals binary byte order.** The Crockford alphabet is ASCII-ordered, so lexicographic sort of canonical forms preserves prefix grouping and UUIDv7 k-sorting. Don't introduce any encoding or display form that breaks this.
 - **Validation order**: length → charset → CRC → version → field codes → reserved-bytes-zero check → UUID version/variant check (high nibble of byte 13 must be `0x7`, top two bits of byte 15 must be `10`).
 
 ## Registries
