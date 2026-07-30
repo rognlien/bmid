@@ -38,7 +38,7 @@ Any implementation or spec edit must respect these — they are the points where
 - **No hyphens, no separators, no segmented display form.** Canonical = 40 unbroken uppercase chars. URN form `urn:bmid:<40-char-id>` is optional but supported.
 - **UUIDv7 is mandatory.** Not v4. Mandating v7 is what makes temporal ordering and index locality real BMID guarantees rather than incidental.
 - **Parse fields from the decoded byte array, not from character offsets in the string.** Field boundaries do not align with Base32 character boundaries.
-- **Validation order**: length → charset → CRC → version → field codes → reserved-bytes-zero check.
+- **Validation order**: length → charset → CRC → version → field codes → reserved-bytes-zero check → UUID version/variant check (high nibble of byte 13 must be `0x7`, top two bits of byte 15 must be `10`).
 
 ## Registries
 
