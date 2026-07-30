@@ -154,7 +154,16 @@ BMID uses Crockford Base32 encoding. This encoding was chosen for the following 
 - Compact: 40 characters for 200 bits (compared to 50 in hex)
 - 5 bits per character aligns perfectly with the 200-bit total — no padding
 
-On input, implementations must accept both upper and lower case, may map `I`/`i`/`L`/`l` to `1` and `O`/`o` to `0` (per Crockford), and must reject any characters outside the alphabet.
+### Input Normalization
+
+Input normalization is mandatory and deterministic: every conforming implementation accepts exactly the same set of input strings. Before validation, implementations must, in order:
+
+1. Strip leading and trailing whitespace.
+2. Strip all ASCII hyphens (`-`), which Crockford Base32 permits as visual separators on input.
+3. Fold to uppercase.
+4. Map `I` → `1`, `L` → `1`, and `O` → `0` (per Crockford).
+
+After normalization, any remaining character outside the 32-character alphabet — including interior whitespace — must cause rejection. Normalization is an input-handling step only: the canonical form never contains lowercase letters, hyphens, or the mapped characters.
 
 ### Check Bytes
 
@@ -260,8 +269,8 @@ There is no other display form. Hyphens, spaces, and other separators are not pa
 
 A conforming implementation must validate the following on input, in this order:
 
-1. **Length:** exactly 40 Base32 characters after stripping whitespace and normalizing case.
-2. **Character set:** all characters must be valid Crockford Base32 symbols (after applying optional `I`/`L`→`1`, `O`→`0` normalization).
+1. **Length:** exactly 40 characters after input normalization (see *Input Normalization*).
+2. **Character set:** all normalized characters must be valid Crockford Base32 symbols.
 3. **CRC:** Base32-decode the input, recompute CRC-16/XMODEM over the first 23 bytes, and compare to bytes 23–24.
 4. **Version:** the version byte must be a recognized version. Unknown versions should be rejected or routed to a version-aware handler.
 5. **Entity type, vendor ID, environment:** codes should be within known ranges. Unknown codes may be accepted with a warning to support forward compatibility with newly-registered values.
