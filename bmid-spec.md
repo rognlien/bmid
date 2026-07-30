@@ -49,7 +49,7 @@ A BMID consists of 25 bytes (200 bits) organized into seven fields. The non-UUID
 | 2 | **Vendor ID** | 1 byte | Partner organization that minted the identifier. See *Vendor Registry*. |
 | 3 | **Environment** | 1 byte | Operational environment. See *Environment Registry*. |
 | 4–6 | **Reserved** | 3 bytes | Reserved for future use. Must be `0x00 0x00 0x00` in version 1. |
-| 7–22 | **UUID Payload** | 16 bytes | A UUIDv7 (RFC 9562). Mandatory. |
+| 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 recommended for newly minted identifiers. |
 | 23–24 | **Check Bytes** | 2 bytes | CRC-16/XMODEM over bytes 0–22, big-endian. |
 
 **Total:** 25 bytes = 200 bits = 40 Crockford Base32 characters.
@@ -83,6 +83,22 @@ Decoded bytes (hex):
 | `[4–6]` | `0x00 0x00 0x00` | Reserved |
 | `[7–22]` | `01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B` | UUIDv7 payload |
 | `[23–24]` | `0x47 0x04` | CRC-16/XMODEM = `0x4704` |
+
+### Worked Example — Wrapped Legacy UUID
+
+An Agent whose pre-existing UUIDv4 `f47ac10b-58cc-4372-a567-0e02b2c3d479` is wrapped by the testing vendor (`0xFF`) in the production environment:
+
+```
+042ZY080000F8YP11DCCRGVJMNKGW0NJRFA7JNZQ
+```
+
+Decoded bytes (hex):
+
+```
+01 05 FF 01 00 00 00  F4 7A C1 0B 58 CC 43 72 A5 67 0E 02 B2 C3 D4 79  57 F7
+```
+
+The payload is the original UUID verbatim — bytes 7–22 recover it exactly. Its version nibble (`4` in byte 13) tells any consumer that this payload carries no timestamp.
 
 ### URN Form
 
@@ -167,7 +183,7 @@ After normalization, any remaining character outside the 32-character alphabet �
 
 ### Sort Order
 
-The Crockford Base32 alphabet is in ascending ASCII order. Lexicographic comparison of canonical forms is therefore byte-for-byte equivalent to comparison of the underlying 25-byte binary forms. Sorting BMIDs as canonical strings groups identifiers by version, entity type, vendor, and environment, and orders them by UUIDv7 timestamp within each group — exactly the clustering and k-sortable behavior of the binary form.
+The Crockford Base32 alphabet is in ascending ASCII order. Lexicographic comparison of canonical forms is therefore byte-for-byte equivalent to comparison of the underlying 25-byte binary forms. Sorting BMIDs as canonical strings groups identifiers by version, entity type, vendor, and environment — exactly the clustering behavior of the binary form. Within a group, UUIDv7 payloads additionally sort by mint timestamp; wrapped non-v7 payloads sort in their (random) byte order.
 
 This equivalence is a guarantee of the format, and it holds only for the canonical form: uppercase, no separators, exactly 40 characters. Future revisions must not introduce an encoding or display form that breaks it.
 
@@ -198,18 +214,30 @@ The CRC provides:
 
 ### UUID Payload
 
-The 16-byte payload is a **UUIDv7** (RFC 9562). UUIDv7 is mandatory in BMID v1, and validators enforce it: a BMID whose payload does not carry the UUIDv7 version and variant bits is invalid (see *Validation*, step 7). It is mandatory for the following reasons:
+The 16-byte payload is any valid **RFC 9562 UUID**. Validators enforce structural validity — the RFC 9562 variant bits and a defined version nibble (see *Validation*, step 7) — but not a specific version.
+
+**Newly minted identifiers should use UUIDv7**, for the following reasons:
 
 - The embedded millisecond timestamp enables temporal ordering and time-range queries directly from the identifier
 - K-sortable insertion order substantially improves B-tree and index locality compared to random UUIDv4
 - The timestamp is extractable for audit and debugging without external metadata
-- A consistent UUID version across the ecosystem allows downstream systems to rely on these properties
 
-Trade-offs accepted by mandating UUIDv7:
+**Any RFC 9562 UUID version is permitted** so that pre-existing UUIDs can be wrapped as BMIDs deterministically: the legacy UUID is placed in the payload verbatim, and it is recoverable from any BMID by extracting bytes 7–22. No lookup table or re-keying is required at migration boundaries.
+
+The UUID's version nibble travels inside the payload, so every BMID self-describes whether its payload is time-ordered. Consumers that exploit temporal ordering (time-range scans, timestamp extraction) must check the version nibble first: those properties hold for v7 payloads and are absent for wrapped v4 (or other) payloads. Prefix grouping, error detection, routing, and provenance are unaffected by payload version.
+
+Trade-offs of a UUIDv7 payload:
 
 - The minting time is observable to anyone who holds the BMID. For book metadata this is rarely sensitive, but consider embargoes or pre-announcement workflows.
-- Slightly less entropy than UUIDv4 (62 random bits vs. 122). This remains safe for uniqueness; do not rely on UUID values for unguessability in any case.
+- Slightly less entropy than UUIDv4 (at least 62 random bits vs. 122). This remains safe for uniqueness; do not rely on UUID values for unguessability in any case.
 - Within-millisecond burst minting requires a UUIDv7 implementation that handles monotonicity correctly.
+
+### Wrapping Pre-Existing UUIDs
+
+Wrapping is deterministic: given the same version, entity type, vendor, environment, and UUID, everyone computes the same BMID. Two rules keep wrapping coherent:
+
+- **Wrap once.** The partner that owns the legacy record mints the wrap. Two partners must not independently wrap the same UUID — different vendor bytes would yield two distinct BMIDs for one entity. If shared legacy UUIDs exist, agree on a single wrapping authority per corpus before migration.
+- **The vendor byte identifies the BMID minter,** i.e. the wrapping organization — not whoever originally generated the legacy UUID. This is consistent with the vendor field's meaning everywhere else: provenance of the identifier, at mint time.
 
 ---
 
@@ -221,7 +249,8 @@ Trade-offs accepted by mandating UUIDv7:
 | Source attribution | Vendor ID field | Not supported |
 | Environment awareness | Built-in flag | Not supported |
 | Error detection | CRC-16 check bytes | None |
-| Temporal ordering | Mandatory UUIDv7 | UUIDv7 only if chosen |
+| Temporal ordering | UUIDv7 payloads (default for new mints); self-describing | UUIDv7 only if chosen; not inspectable per-ecosystem |
+| Legacy UUID migration | Deterministic wrapping, original recoverable | Identity function (already a UUID) |
 | Global uniqueness | UUID-based | UUID-based |
 | Transcription resilience | Crockford Base32 + CRC | Hex (easy errors) |
 | Independent minting | Native multi-vendor | No coordination |
@@ -238,7 +267,7 @@ When a user pastes a BMID into a search field, the application can immediately d
 
 ### Coordinated Federation with Independent Minting
 
-BMIDs are minted independently by a small, explicitly registered set of partner organizations. Global uniqueness is guaranteed by the UUIDv7 payload without runtime coordination or central authority in the mint path. Provenance is preserved by the vendor ID field, whose values are allocated from the registry maintained with this specification.
+BMIDs are minted independently by a small, explicitly registered set of partner organizations. Global uniqueness is guaranteed by the UUID payload without runtime coordination or central authority in the mint path. Provenance is preserved by the vendor ID field, whose values are allocated from the registry maintained with this specification.
 
 This model fits trusted-consortium metadata ecosystems on the order of tens of partners. It does not claim to be an open, zero-coordination system — vendor and entity-type allocations are coordinated at specification-evolution time, not at mint time. Partners submit a PR to request an allocation.
 
@@ -281,7 +310,7 @@ A conforming implementation must validate the following on input, in this order:
 4. **Version:** the version byte must be a recognized version. Unknown versions should be rejected or routed to a version-aware handler.
 5. **Entity type, vendor ID, environment:** codes should be within known ranges. Unknown codes may be accepted with a warning to support forward compatibility with newly-registered values.
 6. **Reserved bytes:** in version 1, bytes 4–6 should be zero. Non-zero reserved bytes from a v1 producer indicate a bug or corruption; consumers may accept and ignore them for forward compatibility.
-7. **UUID version and variant:** the high nibble of byte 13 of the decoded array (byte 6 of the UUID payload) must be `0x7`, and the two most significant bits of byte 15 (byte 8 of the payload) must be `10` (the RFC 9562 variant). Inputs failing this check must be rejected in version 1 — the temporal-ordering and index-locality guarantees hold only if the payload is actually a UUIDv7.
+7. **UUID version and variant:** the two most significant bits of byte 15 of the decoded array (byte 8 of the UUID payload) must be `10` (the RFC 9562 variant), and the high nibble of byte 13 (byte 6 of the payload) must be a version defined by RFC 9562 (`0x1`–`0x8`). Inputs failing this check must be rejected in version 1. Note that this is a structural check only — it does not require v7. Consumers relying on temporal ordering must additionally inspect the version nibble (see *UUID Payload*).
 
 The CRC algorithm is fixed across all versions of the specification, so step 3 never depends on step 4.
 
@@ -313,7 +342,7 @@ The vendor ID and environment fields are informational and must not be treated a
 
 The vendor ID field reveals the original minter of an identifier, which may carry commercial sensitivity (sourcing relationships, catalog provenance). Partners exposing BMIDs to external consumers should consider whether this disclosure is acceptable in their use case.
 
-The UUIDv7 payload reveals the millisecond timestamp at which the identifier was minted. This is generally not sensitive for book metadata but should be considered for embargoed or pre-announcement workflows.
+A UUIDv7 payload reveals the millisecond timestamp at which the identifier was minted. This is generally not sensitive for book metadata but should be considered for embargoed or pre-announcement workflows. Wrapped legacy payloads reveal whatever their original UUID version encodes (a v1 UUID, for example, embeds a timestamp and historically a MAC address).
 
 ---
 
@@ -325,7 +354,8 @@ The UUIDv7 payload reveals the millisecond timestamp at which the identifier was
 | **LRM** | IFLA Library Reference Model. The conceptual model for bibliographic entities (Work, Expression, Manifestation, Item, Agent). |
 | **Crockford Base32** | A base-32 encoding alphabet designed by Douglas Crockford. Uses 0–9 and A–Z excluding I, L, O, U. |
 | **CRC-16/XMODEM** | A 16-bit cyclic redundancy check with polynomial `0x1021`, initial value `0x0000`, and no input/output reflection. Used by BMID for error detection over the first 23 bytes. |
-| **UUIDv7** | A UUID version defined in RFC 9562 that embeds a Unix millisecond timestamp for temporal ordering. Mandatory in BMID v1. |
+| **UUIDv7** | A UUID version defined in RFC 9562 that embeds a Unix millisecond timestamp for temporal ordering. The recommended payload for newly minted BMIDs. |
+| **Wrapping** | Minting a BMID whose payload is a pre-existing UUID, verbatim. Deterministic; the original UUID is recoverable from bytes 7–22. |
 | **Vendor ID** | A 1-byte identifier assigned from the central registry to a partner organization that mints BMIDs. |
 | **Minter** | The vendor that originally created a BMID. Identified by the vendor ID field. Distinct from current custodian. |
 | **Custodian** | The current owner of a record. Tracked outside the BMID in mutable metadata. |
