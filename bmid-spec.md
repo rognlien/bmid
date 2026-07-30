@@ -165,6 +165,12 @@ Input normalization is mandatory and deterministic: every conforming implementat
 
 After normalization, any remaining character outside the 32-character alphabet — including interior whitespace — must cause rejection. Normalization is an input-handling step only: the canonical form never contains lowercase letters, hyphens, or the mapped characters.
 
+### Sort Order
+
+The Crockford Base32 alphabet is in ascending ASCII order. Lexicographic comparison of canonical forms is therefore byte-for-byte equivalent to comparison of the underlying 25-byte binary forms. Sorting BMIDs as canonical strings groups identifiers by version, entity type, vendor, and environment, and orders them by UUIDv7 timestamp within each group — exactly the clustering and k-sortable behavior of the binary form.
+
+This equivalence is a guarantee of the format, and it holds only for the canonical form: uppercase, no separators, exactly 40 characters. Future revisions must not introduce an encoding or display form that breaks it.
+
 ### Check Bytes
 
 The trailing 2 bytes are a **CRC-16/XMODEM** checksum computed over the first 23 decoded bytes (version through UUID payload), stored big-endian.
@@ -250,7 +256,7 @@ Crockford Base32 excludes the most commonly confused characters (I/1, L/1, O/0, 
 
 ### Database and Infrastructure Friendly
 
-The fixed-length, prefix-structured format is naturally suited to partitioning. Identifiers for the same entity type and vendor cluster together, improving cache locality and enabling prefix-based sharding. Stored as the raw 25 bytes, the overhead compared to a 16-byte UUID is modest and is offset by the elimination of auxiliary lookup tables for type, source, and environment.
+The fixed-length, prefix-structured format is naturally suited to partitioning. Identifiers for the same entity type and vendor cluster together, improving cache locality and enabling prefix-based sharding. This holds in both storage forms: the canonical string sorts identically to the binary form (see *Sort Order*), so string-keyed and byte-keyed indexes exhibit the same clustering. Stored as the raw 25 bytes, the overhead compared to a 16-byte UUID is modest and is offset by the elimination of auxiliary lookup tables for type, source, and environment.
 
 ---
 
