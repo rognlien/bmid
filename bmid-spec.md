@@ -116,6 +116,8 @@ The URN form is optional. The canonical 40-character form is the authoritative r
 
 The entity type, vendor ID, and environment fields are each allocated from a registry maintained as part of this specification. **New allocations are made by submitting a pull request against this document** with the requested code, the name of the requesting organization, and a contact address.
 
+**Registries are append-only.** Once allocated, a code is never deleted or reassigned — identifiers bearing it exist permanently, and reassignment would misattribute them. A code whose registrant leaves the consortium, or whose meaning is retired, is marked *deprecated* in the registry table and keeps its original meaning for all existing identifiers. This mirrors the rule that BMIDs themselves are never reused (see *Revocation and Deprecation*).
+
 ### Entity Type Registry
 
 | Code | Entity | Description |
@@ -144,6 +146,8 @@ The entity type, vendor ID, and environment fields are each allocated from a reg
 (No partner organizations are allocated in this draft.)
 
 The vendor ID identifies the **minter** at the moment of creation. It is fixed and represents provenance — not authoritative current ownership or custody. Systems that need to track current custody (after acquisitions, rights transfers, or catalog resale) must carry that information in a separate mutable metadata field.
+
+Because registries are append-only, vendor codes are a **lifetime budget**: 254 assignable codes cover all allocations ever made, including partners that later leave or merge. This is ample for the consortium scale this specification targets. Should the space ever approach exhaustion, the reserved bytes (offsets 4–6) allow a future version to widen the vendor field without changing the 25-byte length.
 
 ### Environment Registry
 
