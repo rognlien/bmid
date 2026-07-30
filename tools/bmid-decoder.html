@@ -53,7 +53,16 @@
 
 const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
-const ENVS  = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
+const PARTITIONS = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
+
+function partitionLabel(code) {
+  let label;
+  if (PARTITIONS[code]) label = PARTITIONS[code];
+  else if (code >= 0x10 && code <= 0xFE) label = "vendor-defined";
+  else if (code >= 0x05 && code <= 0x0F) label = "reserved";
+  else label = "invalid";
+  return label;
+}
 
 // Spec "Input Normalization": trim outer whitespace, strip hyphens, fold case,
 // map I/L to 1 and O to 0. Interior whitespace is NOT stripped — it falls
@@ -119,7 +128,7 @@ function parseBmid(input) {
     version: bytes[0],
     entityType: bytes[1],
     vendor: bytes[2],
-    environment: bytes[3],
+    partition: bytes[3],
     reserved: bytes.slice(4, 7),
     uuid, uuidVersion, uuidOk, isV7, mintedAt,
     storedCrc, computedCrc: computed, crcOk: storedCrc === computed
@@ -140,7 +149,7 @@ function renderTable(p) {
       <tr><td class="k">Version</td><td class="v mono">0x${hex(p.version, 2)} (v${p.version})</td></tr>
       <tr><td class="k">Entity</td><td class="v mono">0x${hex(p.entityType, 2)} ${TYPES[p.entityType] || "unknown"}</td></tr>
       <tr><td class="k">Vendor</td><td class="v mono">0x${hex(p.vendor, 2)}${vendorLabel(p.vendor)}</td></tr>
-      <tr><td class="k">Env</td><td class="v mono">0x${hex(p.environment, 2)} ${ENVS[p.environment] || "unknown"}</td></tr>
+      <tr><td class="k">Partition</td><td class="v mono">0x${hex(p.partition, 2)} ${partitionLabel(p.partition)}</td></tr>
       <tr><td class="k">Reserved</td><td class="v mono">${[...p.reserved].map(b => hex(b, 2)).join(" ")}${p.reserved.some(b => b !== 0) ? ' <span class="fail">(must be zero in v1)</span>' : ''}</td></tr>
       <tr><td class="k">UUID</td><td class="v mono">${p.uuid} ${p.uuidOk ? '<span class="hint">(v' + p.uuidVersion + ')</span>' : '<span class="fail">invalid RFC 9562 version/variant</span>'}</td></tr>
       <tr><td class="k">Minted</td><td class="v mono">${p.isV7 ? p.mintedAt.toISOString() : '<span class="hint">n/a — payload is not a UUIDv7</span>'}</td></tr>
@@ -171,7 +180,16 @@ inputEl.addEventListener("keydown", e => { if (e.key === "Enter") runDecode(); }
 const bookmarkletSource = `(function () {
   const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
   const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
-  const ENVS  = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
+  const PARTITIONS = { 1: "Production", 2: "Staging", 3: "Development", 4: "Test" };
+
+  function partitionLabel(code) {
+    let label;
+    if (PARTITIONS[code]) label = PARTITIONS[code];
+    else if (code >= 0x10 && code <= 0xFE) label = "vendor-defined";
+    else if (code >= 0x05 && code <= 0x0F) label = "reserved";
+    else label = "invalid";
+    return label;
+  }
 
   function normalize(s) {
     return s.trim()
@@ -253,7 +271,7 @@ const bookmarkletSource = `(function () {
         row("Version",  '0x' + hex(bytes[0], 2) + ' (v' + bytes[0] + ')') +
         row("Entity",   '0x' + hex(bytes[1], 2) + ' ' + (TYPES[bytes[1]] || 'unknown')) +
         row("Vendor",   '0x' + hex(bytes[2], 2) + vendorLabel) +
-        row("Env",      '0x' + hex(bytes[3], 2) + ' ' + (ENVS[bytes[3]] || 'unknown')) +
+        row("Partition", '0x' + hex(bytes[3], 2) + ' ' + partitionLabel(bytes[3])) +
         row("Reserved", bytes.slice(4, 7).map(b => hex(b, 2)).join(' ') + (bytes.slice(4, 7).some(b => b !== 0) ? ' <span style="color:#c00">(must be zero in v1)</span>' : '')) +
         row("UUID",     uuid + ' <span style="color:' + (uuidOk ? '#888' : '#c00') + '">' + (uuidOk ? '(v' + uuidVersion + ')' : 'invalid RFC 9562 version/variant') + '</span>') +
         row("Minted",   minted) +
