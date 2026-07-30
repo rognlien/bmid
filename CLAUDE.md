@@ -35,7 +35,7 @@ Any implementation or spec edit must respect these — they are the points where
 - **CRC-16/XMODEM** over the first 23 bytes. Parameters: poly `0x1021`, init `0x0000`, refin/refout false, xorout `0x0000`. Test vector: CRC of `"123456789"` is `0x31C3`.
 - **The CRC algorithm is invariant across all BMID versions.** Future version bumps may change anything else, but never the CRC. This is what lets validation compute CRC before reading the version byte.
 - **Crockford Base32 exclusively** (excludes I, L, O, U). Case-insensitive on input. Canonical form is uppercase. 5 bits/char × 40 chars = 200 bits with no padding.
-- **No hyphens, no separators, no segmented display form.** Canonical = 40 unbroken uppercase chars. URN form `urn:bmid:<40-char-id>` is optional but supported.
+- **No hyphens, no separators, no segmented display form.** Canonical = 40 unbroken uppercase chars. URN form `urn:bmid:<40-char-id>` is optional but supported. Input normalization is mandatory and fixed: strip outer whitespace, strip hyphens, uppercase, map I/L→1 and O→0 — then reject anything outside the alphabet.
 - **UUIDv7 is mandatory.** Not v4. Mandating v7 is what makes temporal ordering and index locality real BMID guarantees rather than incidental.
 - **Parse fields from the decoded byte array, not from character offsets in the string.** Field boundaries do not align with Base32 character boundaries.
 - **Validation order**: length → charset → CRC → version → field codes → reserved-bytes-zero check → UUID version/variant check (high nibble of byte 13 must be `0x7`, top two bits of byte 15 must be `10`).
