@@ -28,8 +28,6 @@ UUIDs are excellent at one thing: global uniqueness. But in a book metadata ecos
 
 - **Source tracing:** When multiple partners supply metadata, knowing which partner created an identifier is essential for conflict resolution, quality assessment, and provenance tracking. A UUID carries no such information.
 
-- **Partition routing:** Metadata systems run in parallel environments (production, staging, development) and internal partitions (regions, sub-catalogs, business units). When an identifier is looked up in the wrong place, plain UUIDs can only answer "not found," which is ambiguous. BMIDs carry a partition byte: common codes distinguish environments ecosystem-wide ("not found — this identifier belongs to a staging environment"), and vendor-defined codes give each partner a routing hint for its own sharding.
-
 - **Error detection:** When identifiers are transmitted across systems, copy-pasted, or manually entered, corruption is inevitable. UUID has no built-in detection. BMID includes a 2-byte CRC that catches transcription errors, truncation, and bit-flips.
 
 - **Readability:** Hexadecimal UUIDs are prone to transcription errors (0/O, 1/l, 8/B). Crockford Base32 eliminates ambiguous characters and is case-insensitive — a BMID is designed to survive transcription, verbal communication, and OCR.
@@ -38,7 +36,7 @@ UUIDs are excellent at one thing: global uniqueness. But in a book metadata ecos
 
 ## Identifier Structure
 
-A BMID consists of 25 bytes (200 bits) organized into seven fields. The non-UUID fields precede the payload to enable prefix-based routing and sharding on the decoded byte array without reading the entire identifier.
+A BMID consists of 25 bytes (200 bits) organized into six fields. The non-UUID fields precede the payload to enable prefix-based routing and sharding on the decoded byte array without reading the entire identifier.
 
 ### Byte Layout
 
@@ -47,8 +45,7 @@ A BMID consists of 25 bytes (200 bits) organized into seven fields. The non-UUID
 | 0 | **Version** | 1 byte | BMID format version. Allows future evolution without breaking existing parsers. |
 | 1 | **Entity Type** | 1 byte | LRM entity class. See *Entity Type Registry*. |
 | 2 | **Vendor ID** | 1 byte | Partner organization that minted the identifier. See *Vendor Registry*. |
-| 3 | **Partition** | 1 byte | Environment or vendor-defined routing partition. See *Partition Registry*. |
-| 4–6 | **Reserved** | 3 bytes | Reserved for future use. Must be `0x00 0x00 0x00` in version 1. |
+| 3–6 | **Reserved** | 4 bytes | Reserved for future use (e.g. environment or partition codes, or a wider vendor field). Must be all zero in version 1. |
 | 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 recommended for newly minted identifiers. |
 | 23–24 | **Check Bytes** | 2 bytes | CRC-16/XMODEM over bytes 0–22, big-endian. |
 
@@ -62,16 +59,16 @@ There is no hyphenated or segmented display form. Field boundaries fall on byte 
 
 ### Worked Example
 
-A Manifestation minted by the testing vendor (`0xFF`) in the production environment:
+A Manifestation minted by the testing vendor (`0xFF`):
 
 ```
-041ZY080000033SD9A600W93K8NKRKAYDXX8PHR4
+041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
 ```
 
 Decoded bytes (hex):
 
 ```
-01 03 FF 01 00 00 00  01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B  47 04
+01 03 FF 00 00 00 00  01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B  72 B7
 ```
 
 | Bytes | Value | Meaning |
@@ -79,23 +76,22 @@ Decoded bytes (hex):
 | `[0]` | `0x01` | Version = 1 |
 | `[1]` | `0x03` | Entity type = Manifestation |
 | `[2]` | `0xFF` | Vendor ID = testing |
-| `[3]` | `0x01` | Partition = Production |
-| `[4–6]` | `0x00 0x00 0x00` | Reserved |
+| `[3–6]` | `0x00 0x00 0x00 0x00` | Reserved |
 | `[7–22]` | `01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B` | UUIDv7 payload |
-| `[23–24]` | `0x47 0x04` | CRC-16/XMODEM = `0x4704` |
+| `[23–24]` | `0x72 0xB7` | CRC-16/XMODEM = `0x72B7` |
 
 ### Worked Example — Wrapped Legacy UUID
 
-An Agent whose pre-existing UUIDv4 `f47ac10b-58cc-4372-a567-0e02b2c3d479` is wrapped by the testing vendor (`0xFF`) in the production environment:
+An Agent whose pre-existing UUIDv4 `f47ac10b-58cc-4372-a567-0e02b2c3d479` is wrapped by the testing vendor (`0xFF`):
 
 ```
-042ZY080000F8YP11DCCRGVJMNKGW0NJRFA7JNZQ
+042ZY000000F8YP11DCCRGVJMNKGW0NJRFA7JRJ4
 ```
 
 Decoded bytes (hex):
 
 ```
-01 05 FF 01 00 00 00  F4 7A C1 0B 58 CC 43 72 A5 67 0E 02 B2 C3 D4 79  57 F7
+01 05 FF 00 00 00 00  F4 7A C1 0B 58 CC 43 72 A5 67 0E 02 B2 C3 D4 79  62 44
 ```
 
 The payload is the original UUID verbatim — bytes 7–22 recover it exactly. Its version nibble (`4` in byte 13) tells any consumer that this payload carries no timestamp.
@@ -105,7 +101,7 @@ The payload is the original UUID verbatim — bytes 7–22 recover it exactly. I
 A BMID may be expressed as a URN for use in RDF, BIBFRAME, and other linked-data contexts:
 
 ```
-urn:bmid:041ZY080000033SD9A600W93K8NKRKAYDXX8PHR4
+urn:bmid:041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
 ```
 
 The URN form is optional. The canonical 40-character form is the authoritative representation.
@@ -114,7 +110,7 @@ The URN form is optional. The canonical 40-character form is the authoritative r
 
 ## Registries
 
-The entity type, vendor ID, and partition fields are each allocated from a registry maintained as part of this specification. **New allocations are made by submitting a pull request against this document** with the requested code, the name of the requesting organization, and a contact address.
+The entity type and vendor ID fields are each allocated from a registry maintained as part of this specification. **New allocations are made by submitting a pull request against this document** with the requested code, the name of the requesting organization, and a contact address.
 
 **Registries are append-only.** Once allocated, a code is never deleted or reassigned — identifiers bearing it exist permanently, and reassignment would misattribute them. A code whose registrant leaves the consortium, or whose meaning is retired, is marked *deprecated* in the registry table and keeps its original meaning for all existing identifiers. This mirrors the rule that BMIDs themselves are never reused (see *Revocation and Deprecation*).
 
@@ -147,24 +143,7 @@ The entity type, vendor ID, and partition fields are each allocated from a regis
 
 The vendor ID identifies the **minter** at the moment of creation. It is fixed and represents provenance — not authoritative current ownership or custody. Systems that need to track current custody (after acquisitions, rights transfers, or catalog resale) must carry that information in a separate mutable metadata field.
 
-Because registries are append-only, vendor codes are a **lifetime budget**: 254 assignable codes cover all allocations ever made, including partners that later leave or merge. This is ample for the consortium scale this specification targets. Should the space ever approach exhaustion, the reserved bytes (offsets 4–6) allow a future version to widen the vendor field without changing the 25-byte length.
-
-### Partition Registry
-
-| Code | Meaning |
-|------|---------|
-| `0x00` | *Reserved — invalid* |
-| `0x01` | Production (default) |
-| `0x02` | Staging |
-| `0x03` | Development |
-| `0x04` | Test |
-| `0x05–0x0F` | *Reserved for future common codes* |
-| `0x10–0xFE` | *Vendor-defined routing partitions* |
-| `0xFF` | *Reserved* |
-
-Codes `0x01–0x0F` have fixed, ecosystem-wide meanings allocated in this registry: any consumer can interpret them without vendor context. Codes `0x10–0xFE` are interpreted in the context of the vendor byte — each vendor may assign them to internal routing partitions (regions, sub-catalogs, business units) and documents them for its own consumers. Partners with a single environment and no partitioning needs simply mint `0x01`.
-
-Vendor-defined codes follow the same append-only discipline as this registry: once a vendor has minted identifiers under a code, its meaning must not change — the byte is baked into every identifier bearing it.
+Because registries are append-only, vendor codes are a **lifetime budget**: 254 assignable codes cover all allocations ever made, including partners that later leave or merge. This is ample for the consortium scale this specification targets. Should the space ever approach exhaustion, the reserved bytes (offsets 3–6) allow a future version to widen the vendor field without changing the 25-byte length.
 
 ---
 
@@ -193,7 +172,7 @@ After normalization, any remaining character outside the 32-character alphabet �
 
 ### Sort Order
 
-The Crockford Base32 alphabet is in ascending ASCII order. Lexicographic comparison of canonical forms is therefore byte-for-byte equivalent to comparison of the underlying 25-byte binary forms. Sorting BMIDs as canonical strings groups identifiers by version, entity type, vendor, and partition — exactly the clustering behavior of the binary form. Within a group, UUIDv7 payloads additionally sort by mint timestamp; wrapped non-v7 payloads sort in their (random) byte order.
+The Crockford Base32 alphabet is in ascending ASCII order. Lexicographic comparison of canonical forms is therefore byte-for-byte equivalent to comparison of the underlying 25-byte binary forms. Sorting BMIDs as canonical strings groups identifiers by version, entity type, and vendor — exactly the clustering behavior of the binary form. Within a group, UUIDv7 payloads additionally sort by mint timestamp; wrapped non-v7 payloads sort in their (random) byte order.
 
 This equivalence is a guarantee of the format, and it holds only for the canonical form: uppercase, no separators, exactly 40 characters. Future revisions must not introduce an encoding or display form that breaks it.
 
@@ -244,7 +223,7 @@ Trade-offs of a UUIDv7 payload:
 
 ### Wrapping Pre-Existing UUIDs
 
-Wrapping is deterministic: given the same version, entity type, vendor, partition, and UUID, everyone computes the same BMID. Two rules keep wrapping coherent:
+Wrapping is deterministic: given the same version, entity type, vendor, and UUID, everyone computes the same BMID. Two rules keep wrapping coherent:
 
 - **Wrap once.** The partner that owns the legacy record mints the wrap. Two partners must not independently wrap the same UUID — different vendor bytes would yield two distinct BMIDs for one entity. If shared legacy UUIDs exist, agree on a single wrapping authority per corpus before migration.
 - **The vendor byte identifies the BMID minter,** i.e. the wrapping organization — not whoever originally generated the legacy UUID. This is consistent with the vendor field's meaning everywhere else: provenance of the identifier, at mint time.
@@ -257,7 +236,6 @@ Wrapping is deterministic: given the same version, entity type, vendor, partitio
 |------------|------|-----------|
 | Entity type routing | Encoded in prefix | Not supported |
 | Source attribution | Vendor ID field | Not supported |
-| Environment/partition routing | Built-in partition byte | Not supported |
 | Error detection | CRC-16 check bytes | None |
 | Temporal ordering | UUIDv7 payloads (default for new mints); self-describing | UUIDv7 only if chosen; not inspectable per-ecosystem |
 | Legacy UUID migration | Deterministic wrapping, original recoverable | Identity function (already a UUID) |
@@ -281,12 +259,6 @@ BMIDs are minted independently by a small, explicitly registered set of partner 
 
 This model fits trusted-consortium metadata ecosystems on the order of tens of partners. It does not claim to be an open, zero-coordination system — vendor and entity-type allocations are coordinated at specification-evolution time, not at mint time. Partners submit a PR to request an allocation.
 
-### Partition-Aware Lookup and Routing
-
-The partition byte serves two roles. Common codes (`0x01–0x0F`) let a system that receives a foreign-environment BMID return a clear, actionable error ("this identifier belongs to a staging environment") instead of an ambiguous "not found." Vendor-defined codes (`0x10–0xFE`) give each partner a routing hint of its own: shard by region, sub-catalog, or business unit directly from the identifier prefix, with no lookup.
-
-In both roles the byte is a diagnostic and routing aid, not a security boundary. Environment and partition isolation must continue to be enforced at the network, credential, and data-plane layers — the byte improves the diagnostic experience when those boundaries leak.
-
 ### Self-Describing and Future-Proof
 
 The version byte ensures that the identifier format can evolve without breaking existing parsers. A system encountering a BMID with an unknown version can reject it gracefully or route it to a version-aware handler. The reserved bytes allow modest field additions in future versions.
@@ -297,7 +269,7 @@ Crockford Base32 excludes the most commonly confused characters (I/1, L/1, O/0, 
 
 ### Database and Infrastructure Friendly
 
-The fixed-length, prefix-structured format is naturally suited to partitioning. Identifiers for the same entity type and vendor cluster together, improving cache locality and enabling prefix-based sharding. This holds in both storage forms: the canonical string sorts identically to the binary form (see *Sort Order*), so string-keyed and byte-keyed indexes exhibit the same clustering. Stored as the raw 25 bytes, the overhead compared to a 16-byte UUID is modest and is offset by the elimination of auxiliary lookup tables for type, source, and partition.
+The fixed-length, prefix-structured format is naturally suited to partitioning. Identifiers for the same entity type and vendor cluster together, improving cache locality and enabling prefix-based sharding. This holds in both storage forms: the canonical string sorts identically to the binary form (see *Sort Order*), so string-keyed and byte-keyed indexes exhibit the same clustering. Stored as the raw 25 bytes, the overhead compared to a 16-byte UUID is modest and is offset by the elimination of auxiliary lookup tables for type and source.
 
 ---
 
@@ -320,8 +292,8 @@ A conforming implementation must validate the following on input, in this order:
 2. **Character set:** all normalized characters must be valid Crockford Base32 symbols.
 3. **CRC:** Base32-decode the input, recompute CRC-16/XMODEM over the first 23 bytes, and compare to bytes 23–24.
 4. **Version:** the version byte must be a recognized version. Unknown versions should be rejected or routed to a version-aware handler.
-5. **Entity type, vendor ID, partition:** codes should be within known ranges. Unknown codes may be accepted with a warning to support forward compatibility with newly-registered values. Vendor-defined partition codes (`0x10–0xFE`) are validated against the owning vendor's documentation, not this specification.
-6. **Reserved bytes:** in version 1, bytes 4–6 should be zero. Non-zero reserved bytes from a v1 producer indicate a bug or corruption; consumers may accept and ignore them for forward compatibility.
+5. **Entity type, vendor ID:** codes should be within known ranges. Unknown codes may be accepted with a warning to support forward compatibility with newly-registered values.
+6. **Reserved bytes:** in version 1, bytes 3–6 should be zero. Non-zero reserved bytes from a v1 producer indicate a bug or corruption; consumers may accept and ignore them for forward compatibility.
 7. **UUID version and variant:** the two most significant bits of byte 15 of the decoded array (byte 8 of the UUID payload) must be `10` (the RFC 9562 variant), and the high nibble of byte 13 (byte 6 of the payload) must be a version defined by RFC 9562 (`0x1`–`0x8`). Inputs failing this check must be rejected in version 1. Note that this is a structural check only — it does not require v7. Consumers relying on temporal ordering must additionally inspect the version nibble (see *UUID Payload*).
 
 The CRC algorithm is fixed across all versions of the specification, so step 3 never depends on step 4.
@@ -339,7 +311,6 @@ The most common objection to structured identifiers is that a plain UUID is simp
 - Multiple entity types share the same namespace and must be distinguished without a lookup
 - Multiple partners mint identifiers independently and must be traceable to their source
 - Identifiers appear in UIs, emails, support tickets, and printed materials where transcription matters
-- Environments share infrastructure and must be diagnosable when crossed
 - Data integrity across system boundaries demands built-in error detection
 
 A BMID is not a replacement for UUID — it *contains* a UUID. It is a thin, fixed-cost envelope around a UUID that adds routing, provenance, diagnostic context, and integrity. The cost is 9 additional bytes. The value is the elimination of multiple auxiliary systems, lookup tables, and failure modes.
@@ -350,7 +321,7 @@ A BMID is not a replacement for UUID — it *contains* a UUID. It is a thin, fix
 
 The CRC-16 check bytes are designed for error detection, not security. They do not protect against deliberate tampering. If cryptographic integrity is required, implementations should layer HMAC or digital signatures over the BMID rather than extending the identifier itself.
 
-The vendor ID and partition fields are informational and must not be treated as access control mechanisms. Authorization decisions must be made by the receiving system based on its own trust model.
+The vendor ID field is informational and must not be treated as an access control mechanism. Authorization decisions must be made by the receiving system based on its own trust model.
 
 The vendor ID field reveals the original minter of an identifier, which may carry commercial sensitivity (sourcing relationships, catalog provenance). Partners exposing BMIDs to external consumers should consider whether this disclosure is acceptable in their use case.
 
@@ -368,7 +339,6 @@ A UUIDv7 payload reveals the millisecond timestamp at which the identifier was m
 | **CRC-16/XMODEM** | A 16-bit cyclic redundancy check with polynomial `0x1021`, initial value `0x0000`, and no input/output reflection. Used by BMID for error detection over the first 23 bytes. |
 | **UUIDv7** | A UUID version defined in RFC 9562 that embeds a Unix millisecond timestamp for temporal ordering. The recommended payload for newly minted BMIDs. |
 | **Wrapping** | Minting a BMID whose payload is a pre-existing UUID, verbatim. Deterministic; the original UUID is recoverable from bytes 7–22. |
-| **Partition** | The 1-byte field at offset 3. Common codes (`0x01–0x0F`) name environments with fixed ecosystem-wide meaning; `0x10–0xFE` are vendor-defined routing partitions, scoped by the vendor byte. |
 | **Vendor ID** | A 1-byte identifier assigned from the central registry to a partner organization that mints BMIDs. |
 | **Minter** | The vendor that originally created a BMID. Identified by the vendor ID field. Distinct from current custodian. |
 | **Custodian** | The current owner of a record. Tracked outside the BMID in mutable metadata. |
