@@ -43,7 +43,7 @@ Any implementation or spec edit must respect these — they are the points where
 
 ## Registries
 
-All allocations are made by submitting a PR against `bmid-spec.md`. There is no runtime registry service.
+All allocations are made by submitting a PR against `bmid-spec.md`. There is no runtime registry service. Registries are append-only: codes are never deleted or reassigned, only marked deprecated — reassignment would misattribute existing identifiers. Vendor codes are therefore a lifetime budget of 254.
 
 - **Entity Type** (1 byte): `0x01–0x07` core LRM (Work, Expression, Manifestation, Item, Agent, Series, Subject); `0x08–0x7F` reserved for future LRM/IFLA-aligned types; `0x80–0xFE` available for registry-assigned extensions; `0x00` and `0xFF` reserved.
 - **Vendor ID** (1 byte): `0x01–0xFE` available for assignment to partner organizations; `0x00` invalid; `0xFF` reserved for testing/examples. No allocations in the current draft.
