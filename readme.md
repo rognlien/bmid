@@ -8,7 +8,7 @@ Specification v1.0 — DRAFT | September 2026
 
 ## Summary
 
-A BMID is a 25-byte identifier encoded as 40 Crockford Base32 characters. It wraps an RFC 9562 UUID in a fixed envelope that adds the entity type, the minting organization, and a CRC-16. A BMID is not a replacement for UUID — it *contains* one. The envelope makes the identifier routable without a lookup, attributable to its minter, and safe to transcribe.
+A BMID is a 25-byte identifier encoded as 40 [Crockford Base32](#crockford-base32) characters. It wraps an RFC 9562 UUID in a fixed envelope that adds the entity type, the minting organization, and a CRC-16. A BMID is not a replacement for UUID — it *contains* one. The envelope makes the identifier routable without a lookup, attributable to its minter, and safe to transcribe.
 
 BMID is designed for a consortium of partner organizations that independently mint identifiers for IFLA Library Reference Model (LRM) entities.
 
@@ -45,13 +45,13 @@ A conforming implementation accepts exactly the inputs this specification accept
 | 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 RECOMMENDED for new mints. |
 | 23–24 | **Check Bytes** | 2 bytes | CRC-16/XMODEM over bytes 0–22, big-endian. |
 
-**Total:** 25 bytes = 200 bits = 40 Crockford Base32 characters.
+**Total:** 25 bytes = 200 bits = 40 [Crockford Base32](#crockford-base32) characters.
 
 The fields carry 21 bytes of information. 168 bits does not divide into 5-bit characters; 25 bytes is the smallest size that does. The surplus is held as reserved bytes rather than padding, and the non-UUID fields lead so that the decoded bytes cluster by version, type, and issuer.
 
 ### Canonical Form
 
-The canonical form is exactly **40 Crockford Base32 characters**, uppercase, with no separators or surrounding whitespace. Two BMIDs are equal if and only if their canonical forms are byte-equal. Implementations MUST normalize input to canonical form before comparison, hashing, or use as a key.
+The canonical form is exactly **40 [Crockford Base32](#crockford-base32) characters**, uppercase, with no separators or surrounding whitespace. Two BMIDs are equal if and only if their canonical forms are byte-equal. Implementations MUST normalize input to canonical form before comparison, hashing, or use as a key.
 
 There is no hyphenated or segmented display form. Field boundaries fall on byte offsets in the decoded buffer, not on character offsets in the string. **Implementations MUST parse fields by decoding the entire string and indexing into the resulting 25-byte array.**
 
@@ -125,8 +125,8 @@ Two IRIs denote the same entity if and only if their path segments are the same 
 
 The following hold for every BMID version, present and future. They make it possible to check length, character set, and CRC before the version byte is interpreted.
 
-1. **Length:** 25 bytes; 40 Crockford Base32 characters.
-2. **Encoding:** Crockford Base32 with the bit packing defined in *Encoding*.
+1. **Length:** 25 bytes; 40 [Crockford Base32](#crockford-base32) characters.
+2. **Encoding:** [Crockford Base32](#crockford-base32) with the bit packing defined in *Encoding*.
 3. **Version byte:** 1 byte at offset 0.
 4. **Check bytes:** CRC-16/XMODEM with the parameters defined in *Check Bytes*, computed over bytes 0–22, stored big-endian at bytes 23–24.
 
@@ -192,7 +192,7 @@ Because registries are append-only, the 254 assignable codes are a lifetime budg
 
 ### Crockford Base32
 
-The alphabet, in order:
+BMID uses [Douglas Crockford's Base32 encoding](https://www.crockford.com/base32.html). The alphabet, in order:
 
 ```
 0123456789ABCDEFGHJKMNPQRSTVWXYZ
@@ -278,7 +278,7 @@ There is no other display form. Hyphens, spaces, and other separators are not pa
 A conforming implementation MUST validate the following on input, in this order:
 
 1. **Length:** exactly 40 characters after normalization. Otherwise reject.
-2. **Character set:** every character MUST be in the Crockford Base32 alphabet. Otherwise reject.
+2. **Character set:** every character MUST be in the [Crockford Base32](#crockford-base32) alphabet. Otherwise reject.
 3. **CRC:** decode, recompute CRC-16/XMODEM over bytes 0–22, and compare to bytes 23–24. On mismatch, reject.
 4. **Version:** byte 0 MUST be a version this implementation understands. A version 1 implementation accepts only `0x01`; `0x00` and `0x02–0xFF` MUST be rejected.
 5. **Entity type:** byte 1 MUST NOT be `0x00`. `0xFF` SHOULD be rejected outside test contexts. Reserved or unallocated codes MAY be accepted, optionally with a warning, so that newly registered types are not rejected by older consumers.
@@ -307,7 +307,7 @@ A plain UUID is simpler and sufficient in a system with one entity type, one sou
 | Error detection | CRC-16; any error within three adjacent characters is caught | None |
 | Temporal ordering | Same as the payload; v7 recommended, version nibble inspectable | Same; v7 if chosen, version nibble inspectable |
 | Global uniqueness | UUID-based | UUID-based |
-| Transcription | Crockford Base32: no ambiguous characters, case-insensitive | Hex with hyphens: 0/O, 1/l, 8/B confusable |
+| Transcription | [Crockford Base32](#crockford-base32): no ambiguous characters, case-insensitive | Hex with hyphens: 0/O, 1/l, 8/B confusable |
 | Clustering by type and issuer | In both binary and string form | No |
 | Legacy UUID migration | Deterministic wrap, original recoverable | Identity function |
 | String length | 40 characters | 36 hyphenated, 32 bare |
@@ -358,11 +358,11 @@ Carry the canonical string. Never carry the binary form in JSON.
 
 - **UUIDv7 with a type column.** Works inside one system; type and source are lost when the identifier leaves it, and there is no error detection. BMID is this design plus an envelope that keeps the context attached.
 - **ULID.** Same encoding family, no type, issuer, or check bytes, and not an RFC 9562 UUID.
-- **TypeID.** The closest relative: a readable type prefix, an underscore, and a UUIDv7 in 26 Crockford characters. Variable-length, no issuer, no check bytes, no fixed-width binary form. BMID trades the readable prefix for fixed width, provenance, and error detection.
+- **TypeID.** The closest relative: a readable type prefix, an underscore, and a UUIDv7 in 26 [Crockford](#crockford-base32) characters. Variable-length, no issuer, no check bytes, no fixed-width binary form. BMID trades the readable prefix for fixed width, provenance, and error detection.
 - **ARK.** Its name assigning authority number plays the role of the issuer byte. ARK is a resolvable URL scheme over variable-length names, not a fixed binary key; a BMID can serve as the name part of an ARK.
 - **DOI and Handle.** Resolution infrastructure with registration agencies and per-identifier fees, suited to published objects rather than to internal entity keys minted at scale.
 - **CRC-32.** Two extra bytes would consume half the reserved headroom for a false-acceptance rate already far below what transcription errors demand.
-- **A check character.** A Damm or Crockford mod-37 symbol detects single errors and adjacent transpositions and nothing else; the CRC detects strictly more for one additional byte.
+- **A check character.** A Damm or [Crockford](#crockford-base32) mod-37 symbol detects single errors and adjacent transpositions and nothing else; the CRC detects strictly more for one additional byte.
 - **An environment or partition byte.** Tried and removed. It carried a constant for single-environment partners and baked unstable operational structure into permanent identifiers. Environment belongs in the system that stores the record, not in its key.
 
 ---
