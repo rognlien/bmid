@@ -100,7 +100,7 @@ function parseBmid(input) {
   if (bytes.length !== 25) throw new Error("decoded " + bytes.length + " bytes, expected 25");
   const storedCrc = (bytes[23] << 8) | bytes[24];
   const computed = crc16xmodem(bytes.slice(0, 23));
-  // Spec validation step 7: variant bits must be 10, version nibble 0x1-0x8.
+  // Spec validation step 8: variant bits must be 10, version nibble 0x1-0x8.
   const uuidVersion = bytes[13] >> 4;
   const variantOk = (bytes[15] & 0xC0) === 0x80;
   const uuidOk = variantOk && uuidVersion >= 1 && uuidVersion <= 8;
@@ -117,14 +117,14 @@ function parseBmid(input) {
     canon, bytes,
     version: bytes[0],
     entityType: bytes[1],
-    vendor: bytes[2],
+    issuer: bytes[2],
     reserved: bytes.slice(3, 7),
     uuid, uuidVersion, uuidOk, isV7, mintedAt,
     storedCrc, computedCrc: computed, crcOk: storedCrc === computed
   };
 }
 
-function vendorLabel(v) {
+function issuerLabel(v) {
   if (v === 0x00) return " (invalid)";
   if (v === 0xFF) return " (testing)";
   return "";
@@ -135,9 +135,9 @@ function renderTable(p) {
   return `
     <div class="canon mono">${p.canon}</div>
     <table class="bmid">
-      <tr><td class="k">Version</td><td class="v mono">0x${hex(p.version, 2)} (v${p.version})</td></tr>
+      <tr><td class="k">Version</td><td class="v mono">0x${hex(p.version, 2)} (v${p.version})${p.version !== 1 ? ' <span class="fail">(unknown version)</span>' : ''}</td></tr>
       <tr><td class="k">Entity</td><td class="v mono">0x${hex(p.entityType, 2)} ${TYPES[p.entityType] || "unknown"}</td></tr>
-      <tr><td class="k">Vendor</td><td class="v mono">0x${hex(p.vendor, 2)}${vendorLabel(p.vendor)}</td></tr>
+      <tr><td class="k">Issuer</td><td class="v mono">0x${hex(p.issuer, 2)}${issuerLabel(p.issuer)}</td></tr>
       <tr><td class="k">Reserved</td><td class="v mono">${[...p.reserved].map(b => hex(b, 2)).join(" ")}${p.reserved.some(b => b !== 0) ? ' <span class="fail">(must be zero in v1)</span>' : ''}</td></tr>
       <tr><td class="k">UUID</td><td class="v mono">${p.uuid} ${p.uuidOk ? '<span class="hint">(v' + p.uuidVersion + ')</span>' : '<span class="fail">invalid RFC 9562 version/variant</span>'}</td></tr>
       <tr><td class="k">Minted</td><td class="v mono">${p.isV7 ? p.mintedAt.toISOString() : '<span class="hint">n/a — payload is not a UUIDv7</span>'}</td></tr>
@@ -237,7 +237,7 @@ const bookmarkletSource = `(function () {
   const uuid = bytes.slice(7, 23).map(b => hex(b, 2)).join("")
                     .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
 
-  const vendorLabel = bytes[2] === 0xFF ? " (testing)" : bytes[2] === 0x00 ? " (invalid)" : "";
+  const issuerLabel = bytes[2] === 0xFF ? " (testing)" : bytes[2] === 0x00 ? " (invalid)" : "";
 
   const row = (k, v) => '<tr><td style="padding:2px 14px 2px 0;opacity:.55">' + k + '</td><td>' + v + '</td></tr>';
 
@@ -246,9 +246,9 @@ const bookmarkletSource = `(function () {
       '<div style="font-weight:600;font-size:14px;margin-bottom:6px">BMID</div>' +
       '<div style="word-break:break-all;margin-bottom:10px;opacity:.7">' + canon + '</div>' +
       '<table style="border-collapse:collapse">' +
-        row("Version",  '0x' + hex(bytes[0], 2) + ' (v' + bytes[0] + ')') +
+        row("Version",  '0x' + hex(bytes[0], 2) + ' (v' + bytes[0] + ')' + (bytes[0] !== 1 ? ' <span style="color:#c00">(unknown version)</span>' : '')) +
         row("Entity",   '0x' + hex(bytes[1], 2) + ' ' + (TYPES[bytes[1]] || 'unknown')) +
-        row("Vendor",   '0x' + hex(bytes[2], 2) + vendorLabel) +
+        row("Issuer",   '0x' + hex(bytes[2], 2) + issuerLabel) +
         row("Reserved", bytes.slice(3, 7).map(b => hex(b, 2)).join(' ') + (bytes.slice(3, 7).some(b => b !== 0) ? ' <span style="color:#c00">(must be zero in v1)</span>' : '')) +
         row("UUID",     uuid + ' <span style="color:' + (uuidOk ? '#888' : '#c00') + '">' + (uuidOk ? '(v' + uuidVersion + ')' : 'invalid RFC 9562 version/variant') + '</span>') +
         row("Minted",   minted) +

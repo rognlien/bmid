@@ -2,64 +2,67 @@
 
 **A structured, self-describing identifier for LRM entities**
 
-Specification v1.0 — DRAFT | April 2026
+Specification v1.0 — DRAFT | September 2026
 
 ---
 
-## Executive Summary
+## Summary
 
-The Book Metadata Identifier (BMID) is a structured, self-describing identifier designed for use in book metadata ecosystems aligned with the IFLA Library Reference Model (LRM). It addresses critical limitations of plain UUIDs by embedding routing metadata, source attribution, and error detection directly into the identifier itself.
+A BMID is a 25-byte identifier encoded as 40 Crockford Base32 characters. It wraps an RFC 9562 UUID in a fixed envelope that adds the entity type, the minting organization, and a CRC-16. A BMID is not a replacement for UUID — it *contains* one. The envelope makes the identifier routable without a lookup, attributable to its minter, and safe to transcribe.
 
-A BMID is a 25-byte value encoded as a 40-character Crockford Base32 string. It is globally unique, instantly routable, and resilient to transcription and transmission errors. It is designed for distributed metadata systems where a small consortium of partner organizations independently mint identifiers that can coexist without runtime coordination.
+BMID is designed for a consortium of partner organizations that independently mint identifiers for IFLA Library Reference Model (LRM) entities.
 
 ---
 
 ## Scope
 
-BMID is intended for entities that lack established standard identifiers — Works, Expressions, Manifestations, Items, Agents (contributors, publishers), Series, and Subjects under the LRM model. It does not replace ISBN, ISTC, ISNI, DOI, or other established identifiers. Those continue to be carried as parallel metadata on the records they apply to.
+BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, and Subjects. It does not replace ISBN, ISTC, ISNI, or DOI; those are carried as parallel metadata.
+
+BMIDs are minted by registered **issuers**: metadata aggregators, national bibliographic agencies, large retailers, and similar organizations that maintain entity records on their own authority. Publishers, imprints, and contributors are described *by* BMID-identified records; they do not mint.
 
 ---
 
-## The Problem with Plain UUIDs
+## Conformance
 
-UUIDs are excellent at one thing: global uniqueness. But in a book metadata ecosystem, uniqueness alone is not enough. Consider the following real-world scenarios that a plain UUID cannot address:
+The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RECOMMENDED, NOT RECOMMENDED, MAY, and OPTIONAL in this document are to be interpreted as described in BCP 14 (RFC 2119, RFC 8174) when, and only when, they appear in all capitals.
 
-- **Routing:** A user pastes an identifier into a search field. The system must determine whether this refers to a Work, an Agent, a Series, or a Manifestation. With a UUID, a lookup against every entity table is required. With a BMID, the type is encoded in the prefix — routing is instantaneous.
+The sections *Identifier Structure*, *Invariants Across Versions*, *Registries*, *Encoding*, *Storage*, and *Validation* are **normative**. All other sections are informative.
 
-- **Source tracing:** When multiple partners supply metadata, knowing which partner created an identifier is essential for conflict resolution, quality assessment, and provenance tracking. A UUID carries no such information.
-
-- **Error detection:** When identifiers are transmitted across systems, copy-pasted, or manually entered, corruption is inevitable. UUID has no built-in detection. BMID includes a 2-byte CRC that catches transcription errors, truncation, and bit-flips.
-
-- **Readability:** Hexadecimal UUIDs are prone to transcription errors (0/O, 1/l, 8/B). Crockford Base32 eliminates ambiguous characters and is case-insensitive — a BMID is designed to survive transcription, verbal communication, and OCR.
+A conforming implementation accepts exactly the inputs this specification accepts, rejects exactly the inputs it rejects, and produces canonical output as defined here. It MUST pass every vector in `test-vectors.json`.
 
 ---
 
 ## Identifier Structure
 
-A BMID consists of 25 bytes (200 bits) organized into six fields. The non-UUID fields precede the payload to enable prefix-based routing and sharding on the decoded byte array without reading the entire identifier.
-
 ### Byte Layout
 
 | Offset | Field | Size | Description |
 |--------|-------|------|-------------|
-| 0 | **Version** | 1 byte | BMID format version. Allows future evolution without breaking existing parsers. |
+| 0 | **Version** | 1 byte | BMID format version. See *Version Registry*. |
 | 1 | **Entity Type** | 1 byte | LRM entity class. See *Entity Type Registry*. |
-| 2 | **Vendor ID** | 1 byte | Partner organization that minted the identifier. See *Vendor Registry*. |
-| 3–6 | **Reserved** | 4 bytes | Reserved for future use (e.g. environment or partition codes, or a wider vendor field). Must be all zero in version 1. |
-| 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 recommended for newly minted identifiers. |
+| 2 | **Issuer ID** | 1 byte | Organization that minted the identifier. See *Issuer Registry*. |
+| 3–6 | **Reserved** | 4 bytes | MUST be all zero in version 1. Headroom for future versions (e.g. a wider issuer field). |
+| 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 RECOMMENDED for new mints. |
 | 23–24 | **Check Bytes** | 2 bytes | CRC-16/XMODEM over bytes 0–22, big-endian. |
 
 **Total:** 25 bytes = 200 bits = 40 Crockford Base32 characters.
 
+The fields carry 21 bytes of information. 168 bits does not divide into 5-bit characters; 25 bytes is the smallest size that does. The surplus is held as reserved bytes rather than padding, and the non-UUID fields lead so that the decoded bytes cluster by version, type, and issuer.
+
 ### Canonical Form
 
-The canonical form of a BMID is exactly **40 Crockford Base32 characters**, uppercase, with no separators or surrounding whitespace. Two BMIDs are equal if and only if their canonical forms are byte-equal. Implementations must normalize input to canonical form before comparison, hashing, or use as a key.
+The canonical form is exactly **40 Crockford Base32 characters**, uppercase, with no separators or surrounding whitespace. Two BMIDs are equal if and only if their canonical forms are byte-equal. Implementations MUST normalize input to canonical form before comparison, hashing, or use as a key.
 
-There is no hyphenated or segmented display form. Field boundaries fall on byte offsets in the decoded buffer, not on character offsets in the encoded string. **Implementations parse fields by Base32-decoding the entire string and indexing into the resulting 25-byte array.**
+There is no hyphenated or segmented display form. Field boundaries fall on byte offsets in the decoded buffer, not on character offsets in the string. **Implementations MUST parse fields by decoding the entire string and indexing into the resulting 25-byte array.**
+
+Two visible consequences of the layout:
+
+- The first five characters are the 24 bits of version, entity type, and issuer plus one reserved zero bit. A prefix filter on them selects exactly one (version, entity type, issuer) combination. Version 1 with a core entity type begins `04`.
+- Characters 6–11 are `0` in every version 1 BMID (the reserved bytes). For a UUIDv7 payload character 12 is also `0`, since the top four bits of the millisecond timestamp stay zero until 2527.
 
 ### Worked Example
 
-A Manifestation minted by the testing vendor (`0xFF`):
+A Manifestation minted by the testing issuer (`0xFF`):
 
 ```
 041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
@@ -75,75 +78,113 @@ Decoded bytes (hex):
 |-------|-------|---------|
 | `[0]` | `0x01` | Version = 1 |
 | `[1]` | `0x03` | Entity type = Manifestation |
-| `[2]` | `0xFF` | Vendor ID = testing |
+| `[2]` | `0xFF` | Issuer ID = testing |
 | `[3–6]` | `0x00 0x00 0x00 0x00` | Reserved |
 | `[7–22]` | `01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B` | UUIDv7 payload |
 | `[23–24]` | `0x72 0xB7` | CRC-16/XMODEM = `0x72B7` |
 
 ### Worked Example — Wrapped Legacy UUID
 
-An Agent whose pre-existing UUIDv4 `f47ac10b-58cc-4372-a567-0e02b2c3d479` is wrapped by the testing vendor (`0xFF`):
+An Agent whose pre-existing UUIDv4 `f47ac10b-58cc-4372-a567-0e02b2c3d479` is wrapped by the testing issuer:
 
 ```
 042ZY000000F8YP11DCCRGVJMNKGW0NJRFA7JRJ4
 ```
 
-Decoded bytes (hex):
-
 ```
 01 05 FF 00 00 00 00  F4 7A C1 0B 58 CC 43 72 A5 67 0E 02 B2 C3 D4 79  62 44
 ```
 
-The payload is the original UUID verbatim — bytes 7–22 recover it exactly. Its version nibble (`4` in byte 13) tells any consumer that this payload carries no timestamp.
+Bytes 7–22 are the original UUID verbatim. Its version nibble (`4` in byte 13) tells any consumer that this payload carries no timestamp.
 
 ### URN Form
 
-A BMID may be expressed as a URN for use in RDF, BIBFRAME, and other linked-data contexts:
+A BMID MAY be expressed as `urn:bmid:<canonical form>`:
 
 ```
 urn:bmid:041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
 ```
 
-The URN form is optional. The canonical 40-character form is the authoritative representation.
+The `urn:` and `bmid:` prefixes are case-insensitive (RFC 8141). The `bmid` namespace is not registered with IANA, so this form is informal. The canonical 40-character form is authoritative.
+
+### HTTP IRI Form
+
+For RDF, BIBFRAME, and any context that needs a resolvable identifier, a BMID MAY be expressed as an HTTP IRI whose final path segment is the canonical form. This is the RECOMMENDED form for linked data.
+
+```
+https://id.bmid.example/041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
+```
+
+*[To be decided: the host is a domain owned by the consortium, fixed by this specification once chosen.]*
+
+Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is specified in a companion document. The issuer byte identifies the organization whose resolver is authoritative for an identifier.
+
+---
+
+## Invariants Across Versions
+
+The following hold for every BMID version, present and future. They make it possible to check length, character set, and CRC before the version byte is interpreted.
+
+1. **Length:** 25 bytes; 40 Crockford Base32 characters.
+2. **Encoding:** Crockford Base32 with the bit packing defined in *Encoding*.
+3. **Version byte:** 1 byte at offset 0.
+4. **Check bytes:** CRC-16/XMODEM with the parameters defined in *Check Bytes*, computed over bytes 0–22, stored big-endian at bytes 23–24.
+
+The meaning and layout of bytes 1–22 are defined per version. A future version that needs more room uses the reserved bytes; it MUST NOT change the total length.
 
 ---
 
 ## Registries
 
-The entity type and vendor ID fields are each allocated from a registry maintained as part of this specification. **New allocations are made by submitting a pull request against this document** with the requested code, the name of the requesting organization, and a contact address.
+Version, entity type, and issuer codes are allocated from registries maintained in this document. **Allocations are made by pull request against this document**, giving the requested code, the requesting organization, and an organizational contact address. See *Governance*.
 
-**Registries are append-only.** Once allocated, a code is never deleted or reassigned — identifiers bearing it exist permanently, and reassignment would misattribute them. A code whose registrant leaves the consortium, or whose meaning is retired, is marked *deprecated* in the registry table and keeps its original meaning for all existing identifiers. This mirrors the rule that BMIDs themselves are never reused (see *Revocation and Deprecation*).
+**Registries are append-only.** A code is never deleted or reassigned: identifiers bearing it exist permanently, and reassignment would misattribute them. A retired code is marked *deprecated* and keeps its meaning for existing identifiers.
+
+There is exactly one BMID registry. A code means the same thing in every system that handles BMIDs.
+
+### Version Registry
+
+| Code | Meaning |
+|------|---------|
+| `0x00` | *Reserved — invalid.* MUST be rejected. |
+| `0x01` | Version 1, this specification. |
+| `0x02–0xFF` | *Undefined.* MUST be rejected by version 1 implementations. |
 
 ### Entity Type Registry
 
 | Code | Entity | Description |
 |------|--------|-------------|
-| `0x00` | *Reserved* | Invalid; must not be used. |
-| `0x01` | **Work** | An abstract intellectual creation (IFLA LRM). |
-| `0x02` | **Expression** | A realization of a Work in a specific form. |
-| `0x03` | **Manifestation** | A physical or digital embodiment. |
-| `0x04` | **Item** | A specific exemplar of a Manifestation. |
-| `0x05` | **Agent** | A person or corporate body (contributor, publisher). |
-| `0x06` | **Series** | An ordered collection of related Works. |
+| `0x00` | *Reserved* | Invalid; MUST be rejected. |
+| `0x01` | **Work** | An abstract intellectual creation (LRM-E2). |
+| `0x02` | **Expression** | A realization of a Work in a specific form (LRM-E3). |
+| `0x03` | **Manifestation** | A physical or digital embodiment (LRM-E4). |
+| `0x04` | **Item** | A specific exemplar of a Manifestation (LRM-E5). |
+| `0x05` | **Agent** | A person or collective agent (LRM-E6, covering E7 and E8), e.g. a contributor or publisher. |
+| `0x06` | **Series** | A collection of related Works, numbered or unnumbered. |
 | `0x07` | **Subject** | A topic, theme, or classification heading. |
-| `0x08–0x0F` | *Reserved* | Headroom for additional core LRM types. |
-| `0x10–0x7F` | *Reserved* | Reserved for future IFLA/LRM-aligned types. |
-| `0x80–0xFE` | *Available* | Registry-assigned extensions. |
-| `0xFF` | *Reserved* | Reserved for testing and examples. |
+| `0x08–0x7F` | *Reserved* | Future core types defined by this specification. |
+| `0x80–0xFE` | *Available* | Registry-assigned extension types. |
+| `0xFF` | *Reserved* | Testing and examples. SHOULD be rejected outside test contexts. |
 
-### Vendor Registry
+The list is pragmatic rather than a transcription of LRM. Series and Subject get their own codes because they are independently maintained and looked up in practice; Person and Collective Agent share a code because they are typically held in one authority file.
 
-| Code | Vendor |
+**Criterion for a new type.** A code is allocated for a class that is *independently resolvable*: it has its own records and its own lookup path. A distinction expressed as an attribute of an existing class (Person versus Collective Agent, print versus digital Manifestation) belongs in metadata, not in the type byte.
+
+**The entity type is immutable.** A record minted with the wrong type MUST be deprecated in favour of a new BMID of the correct type (see *Revocation and Deprecation*). Issuers SHOULD mint only once an entity's class is settled.
+
+### Issuer Registry
+
+| Code | Issuer |
 |------|--------|
-| `0x00` | *Reserved — invalid* |
-| `0x01–0xFE` | *Available — registry-assigned* |
-| `0xFF` | *Reserved for testing and examples* |
+| `0x00` | *Reserved — invalid.* MUST be rejected. |
+| `0x01–0xFE` | *Available — registry-assigned.* |
+| `0xFF` | *Reserved for testing and examples.* SHOULD be rejected outside test contexts. |
 
 (No partner organizations are allocated in this draft.)
 
-The vendor ID identifies the **minter** at the moment of creation. It is fixed and represents provenance — not authoritative current ownership or custody. Systems that need to track current custody (after acquisitions, rights transfers, or catalog resale) must carry that information in a separate mutable metadata field.
+The issuer ID identifies the **minter** at the moment of creation. It is provenance, not current custody. Systems that track custody (after acquisitions, rights transfers, or catalog resale) MUST carry it in a separate mutable metadata field.
 
-Because registries are append-only, vendor codes are a **lifetime budget**: 254 assignable codes cover all allocations ever made, including partners that later leave or merge. This is ample for the consortium scale this specification targets. Should the space ever approach exhaustion, the reserved bytes (offsets 3–6) allow a future version to widen the vendor field without changing the 25-byte length.
+Because registries are append-only, the 254 assignable codes are a lifetime budget covering every allocation ever made. Should it approach exhaustion, the reserved bytes allow a future version to widen the field without changing the length.
 
 ---
 
@@ -151,36 +192,39 @@ Because registries are append-only, vendor codes are a **lifetime budget**: 254 
 
 ### Crockford Base32
 
-BMID uses Crockford Base32 encoding. This encoding was chosen for the following properties:
+The alphabet, in order:
 
-- Case-insensitive on input; canonical output is uppercase
-- No ambiguous characters: excludes I, L, O, and U to prevent confusion with 1, 0, and V
-- URL-safe and filename-safe without escaping
-- Compact: 40 characters for 200 bits (compared to 50 in hex)
-- 5 bits per character aligns perfectly with the 200-bit total — no padding
+```
+0123456789ABCDEFGHJKMNPQRSTVWXYZ
+```
+
+It excludes I, L, and O (confusable with 1 and 0) and U. Input is case-insensitive; canonical output is uppercase. It is URL- and filename-safe, and 5 bits per character fits the 200-bit total with no padding.
+
+**Bit packing.** The 25-byte array is interpreted as a 200-bit unsigned integer, most significant byte first. Each character encodes five bits, most significant group first: the first character carries bits 0–4 of byte 0, the second carries bits 5–7 of byte 0 and bits 0–1 of byte 1, and so on. Decoding is the exact inverse. Libraries that pack least-significant-first, or that pad to an 8-character boundary as RFC 4648 does, are not conformant.
+
+BMID does **not** use Crockford's optional check symbol; the check bytes provide error detection.
 
 ### Input Normalization
 
-Input normalization is mandatory and deterministic: every conforming implementation accepts exactly the same set of input strings. Before validation, implementations must, in order:
+Before validation, implementations MUST, in order:
 
-1. Strip leading and trailing whitespace.
-2. Strip all ASCII hyphens (`-`), which Crockford Base32 permits as visual separators on input.
-3. Fold to uppercase.
-4. Map `I` → `1`, `L` → `1`, and `O` → `0` (per Crockford).
+1. Strip leading and trailing whitespace (any character with the Unicode `White_Space` property).
+2. If the string begins with `urn:bmid:` (case-insensitive), remove that prefix.
+3. Strip all ASCII hyphens (`-`).
+4. Fold to uppercase.
+5. Map `I` → `1`, `L` → `1`, and `O` → `0`.
 
-After normalization, any remaining character outside the 32-character alphabet — including interior whitespace — must cause rejection. Normalization is an input-handling step only: the canonical form never contains lowercase letters, hyphens, or the mapped characters.
+Any remaining character outside the alphabet — including interior whitespace — MUST cause rejection. Normalization applies to input only; the canonical form never contains lowercase letters, hyphens, a URN prefix, or the mapped characters.
 
 ### Sort Order
 
-The Crockford Base32 alphabet is in ascending ASCII order. Lexicographic comparison of canonical forms is therefore byte-for-byte equivalent to comparison of the underlying 25-byte binary forms. Sorting BMIDs as canonical strings groups identifiers by version, entity type, and vendor — exactly the clustering behavior of the binary form. Within a group, UUIDv7 payloads additionally sort by mint timestamp; wrapped non-v7 payloads sort in their (random) byte order.
+The alphabet is in ascending ASCII order, so lexicographic comparison of canonical forms is byte-for-byte equivalent to comparison of the binary forms. Sorting canonical strings groups identifiers by version, entity type, and issuer; within a group, UUIDv7 payloads sort by mint timestamp.
 
-This equivalence is a guarantee of the format, and it holds only for the canonical form: uppercase, no separators, exactly 40 characters. Future revisions must not introduce an encoding or display form that breaks it.
+This holds only for the canonical form and only under a **binary (ordinal) collation**. Locale-aware collations MUST NOT be used for columns or indexes holding canonical BMIDs; use, for example, `COLLATE "C"` in PostgreSQL or a `_bin` collation in MySQL. Future revisions MUST NOT introduce an encoding or display form that breaks this equivalence.
 
 ### Check Bytes
 
-The trailing 2 bytes are a **CRC-16/XMODEM** checksum computed over the first 23 decoded bytes (version through UUID payload), stored big-endian.
-
-CRC-16/XMODEM parameters:
+Bytes 23–24 are a **CRC-16/XMODEM** over bytes 0–22, stored big-endian.
 
 | Parameter | Value |
 |-----------|-------|
@@ -192,153 +236,170 @@ CRC-16/XMODEM parameters:
 
 **Test vector:** CRC-16/XMODEM of the ASCII string `"123456789"` is `0x31C3`.
 
-The CRC algorithm and parameters are **invariant across all versions of this specification.** Future version bumps may change any other field, but CRC computation remains bit-compatible. This eliminates a chicken-and-egg situation in validation: CRC validation is always possible without first parsing the version byte.
+The CRC algorithm and parameters are invariant across all versions (see *Invariants Across Versions*), so the CRC can always be checked before the version byte is parsed.
 
-The CRC provides:
-
-- Detection of any single-character transcription error
-- Detection of transposed adjacent characters
-- Detection of truncation or padding errors
-- A 1-in-65,536 false-acceptance rate for random corruption
+The CRC detects every error confined to 16 consecutive bits of the decoded value. Since each character carries five bits, this covers any error within three adjacent characters, including every single-character error and every adjacent transposition. Other errors are falsely accepted with probability 1 in 65,536. Truncation and padding are rejected by the length check. The CRC detects errors; it does not correct them.
 
 ### UUID Payload
 
-The 16-byte payload is any valid **RFC 9562 UUID**. Validators enforce structural validity — the RFC 9562 variant bits and a defined version nibble (see *Validation*, step 7) — but not a specific version.
+The 16-byte payload is any valid **RFC 9562 UUID**. Validators enforce the variant bits and a defined version nibble (see *Validation*), not a specific version.
 
-**Newly minted identifiers should use UUIDv7**, for the following reasons:
+**Newly minted identifiers SHOULD use UUIDv7.** Its millisecond timestamp gives temporal ordering, time-range queries, and an extractable mint time, and its k-sortability improves index locality. Trade-offs: the mint time is observable to anyone holding the BMID (consider embargoes); entropy is at least 62 random bits rather than 122, which remains safe for uniqueness; burst minting needs a monotonic UUIDv7 implementation.
 
-- The embedded millisecond timestamp enables temporal ordering and time-range queries directly from the identifier
-- K-sortable insertion order substantially improves B-tree and index locality compared to random UUIDv4
-- The timestamp is extractable for audit and debugging without external metadata
-
-**Any RFC 9562 UUID version is permitted** so that pre-existing UUIDs can be wrapped as BMIDs deterministically: the legacy UUID is placed in the payload verbatim, and it is recoverable from any BMID by extracting bytes 7–22. No lookup table or re-keying is required at migration boundaries.
-
-The UUID's version nibble travels inside the payload, so every BMID self-describes whether its payload is time-ordered. Consumers that exploit temporal ordering (time-range scans, timestamp extraction) must check the version nibble first: those properties hold for v7 payloads and are absent for wrapped v4 (or other) payloads. Prefix grouping, error detection, routing, and provenance are unaffected by payload version.
-
-Trade-offs of a UUIDv7 payload:
-
-- The minting time is observable to anyone who holds the BMID. For book metadata this is rarely sensitive, but consider embargoes or pre-announcement workflows.
-- Slightly less entropy than UUIDv4 (at least 62 random bits vs. 122). This remains safe for uniqueness; do not rely on UUID values for unguessability in any case.
-- Within-millisecond burst minting requires a UUIDv7 implementation that handles monotonicity correctly.
+**Any RFC 9562 version is permitted** so that pre-existing UUIDs can be wrapped verbatim and recovered from bytes 7–22 without a lookup table. The version nibble travels inside the payload, so every BMID self-describes whether it is time-ordered. Consumers relying on temporal ordering MUST check the version nibble first. Prefix grouping, error detection, routing, and provenance are unaffected by payload version.
 
 ### Wrapping Pre-Existing UUIDs
 
-Wrapping is deterministic: given the same version, entity type, vendor, and UUID, everyone computes the same BMID. Two rules keep wrapping coherent:
+Wrapping is deterministic: the same version, entity type, issuer, and UUID always yield the same BMID.
 
-- **Wrap once.** The partner that owns the legacy record mints the wrap. Two partners must not independently wrap the same UUID — different vendor bytes would yield two distinct BMIDs for one entity. If shared legacy UUIDs exist, agree on a single wrapping authority per corpus before migration.
-- **The vendor byte identifies the BMID minter,** i.e. the wrapping organization — not whoever originally generated the legacy UUID. This is consistent with the vendor field's meaning everywhere else: provenance of the identifier, at mint time.
+- **Wrap once.** The partner that owns the legacy record mints the wrap. Two partners MUST NOT independently wrap the same UUID; different issuer bytes would yield two BMIDs for one entity. Agree on a single wrapping authority per corpus before migration.
+- **The issuer byte identifies the wrapping organization,** not whoever generated the legacy UUID.
 
----
-
-## Comparison with Plain UUIDs
-
-| Capability | BMID | Plain UUID |
-|------------|------|-----------|
-| Entity type routing | Encoded in prefix | Not supported |
-| Source attribution | Vendor ID field | Not supported |
-| Error detection | CRC-16 check bytes | None |
-| Temporal ordering | UUIDv7 payloads (default for new mints); self-describing | UUIDv7 only if chosen; not inspectable per-ecosystem |
-| Legacy UUID migration | Deterministic wrapping, original recoverable | Identity function (already a UUID) |
-| Global uniqueness | UUID-based | UUID-based |
-| Transcription resilience | Crockford Base32 + CRC | Hex (easy errors) |
-| Independent minting | Native multi-vendor | No coordination |
-| Prefix-based sharding | Natural support | Random distribution |
-| Self-describing | Yes (version + type) | No |
+**What cannot be wrapped.** The Nil UUID, the Max UUID, GUIDs using the Microsoft or NCS variant, and arbitrary 128-bit values without RFC 9562 version and variant bits fail structural validation. Such identifiers must be re-keyed with a fresh UUIDv7 and a mapping table maintained by the issuer.
 
 ---
 
-## Key Advantages
+## Storage
 
-### Instant Routing from a Search Field
+Three storage strategies are conformant. In all of them, the canonical string is the form that crosses system boundaries.
 
-When a user pastes a BMID into a search field, the application can immediately determine the entity type from the prefix and route the query to the correct service or database partition. There is no need for a multi-table lookup, a central registry, or any network call to determine what kind of entity the identifier refers to.
+1. **Binary (25 bytes).** Most compact. Suitable for primary keys and binary protocols.
+2. **Canonical string (40 characters).** For APIs, logs, URLs, and display. Columns MUST use a binary collation (see *Sort Order*).
+3. **Decomposed.** A BMID is a pure function of (version, entity type, issuer, UUID). A system keyed by UUID keeps that key, adds entity type and issuer as two small columns, and computes the BMID at its boundary. Reserved and check bytes need not be stored. This is the RECOMMENDED path for wrapped legacy identifiers.
 
-### Coordinated Federation with Independent Minting
+In the decomposed form the issuer column is part of the identity and MUST be stored for every record, never inferred from the system's own identity: a wrapped identifier keeps the issuer that minted the wrap even after the record changes hands.
 
-BMIDs are minted independently by a small, explicitly registered set of partner organizations. Global uniqueness is guaranteed by the UUID payload without runtime coordination or central authority in the mint path. Provenance is preserved by the vendor ID field, whose values are allocated from the registry maintained with this specification.
-
-This model fits trusted-consortium metadata ecosystems on the order of tens of partners. It does not claim to be an open, zero-coordination system — vendor and entity-type allocations are coordinated at specification-evolution time, not at mint time. Partners submit a PR to request an allocation.
-
-### Self-Describing and Future-Proof
-
-The version byte ensures that the identifier format can evolve without breaking existing parsers. A system encountering a BMID with an unknown version can reject it gracefully or route it to a version-aware handler. The reserved bytes allow modest field additions in future versions.
-
-### Designed to Survive Transcription, Verbal Communication, and OCR
-
-Crockford Base32 excludes the most commonly confused characters (I/1, L/1, O/0, U/V) and is case-insensitive. Combined with the CRC, a BMID communicated over a phone call, printed on a shipping label, or extracted via OCR will either arrive intact or fail validation — silent corruption is unlikely.
-
-### Database and Infrastructure Friendly
-
-The fixed-length, prefix-structured format is naturally suited to partitioning. Identifiers for the same entity type and vendor cluster together, improving cache locality and enabling prefix-based sharding. This holds in both storage forms: the canonical string sorts identically to the binary form (see *Sort Order*), so string-keyed and byte-keyed indexes exhibit the same clustering. Stored as the raw 25 bytes, the overhead compared to a 16-byte UUID is modest and is offset by the elimination of auxiliary lookup tables for type and source.
+There is no other display form. Hyphens, spaces, and other separators are not part of the format.
 
 ---
 
-## Implementation Notes
+## Validation
 
-### Storage
+A conforming implementation MUST validate the following on input, in this order:
 
-BMIDs can be stored in two forms:
+1. **Length:** exactly 40 characters after normalization. Otherwise reject.
+2. **Character set:** every character MUST be in the Crockford Base32 alphabet. Otherwise reject.
+3. **CRC:** decode, recompute CRC-16/XMODEM over bytes 0–22, and compare to bytes 23–24. On mismatch, reject.
+4. **Version:** byte 0 MUST be a version this implementation understands. A version 1 implementation accepts only `0x01`; `0x00` and `0x02–0xFF` MUST be rejected.
+5. **Entity type:** byte 1 MUST NOT be `0x00`. `0xFF` SHOULD be rejected outside test contexts. Reserved or unallocated codes MAY be accepted, optionally with a warning, so that newly registered types are not rejected by older consumers.
+6. **Issuer ID:** byte 2 MUST NOT be `0x00`. `0xFF` SHOULD be rejected outside test contexts. Unallocated codes MAY be accepted, optionally with a warning.
+7. **Reserved bytes:** bytes 3–6 MUST all be `0x00`. Otherwise reject. A future version that assigns meaning to these bytes changes the version byte.
+8. **UUID version and variant:** the two most significant bits of byte 15 (byte 8 of the payload) MUST be `10`, and the high nibble of byte 13 (byte 6 of the payload) MUST be `0x1`–`0x8`. Otherwise reject. This is a structural check only; it does not require v7.
 
-- **Binary (25 bytes):** Most compact. Suitable for database primary keys and binary protocols.
-- **Crockford Base32 (40 chars):** Canonical string representation. Use for APIs, logs, URLs, and user-facing display.
-
-There is no other display form. Hyphens, spaces, and other separators are not part of the BMID format.
-
-### Validation
-
-A conforming implementation must validate the following on input, in this order:
-
-1. **Length:** exactly 40 characters after input normalization (see *Input Normalization*).
-2. **Character set:** all normalized characters must be valid Crockford Base32 symbols.
-3. **CRC:** Base32-decode the input, recompute CRC-16/XMODEM over the first 23 bytes, and compare to bytes 23–24.
-4. **Version:** the version byte must be a recognized version. Unknown versions should be rejected or routed to a version-aware handler.
-5. **Entity type, vendor ID:** codes should be within known ranges. Unknown codes may be accepted with a warning to support forward compatibility with newly-registered values.
-6. **Reserved bytes:** in version 1, bytes 3–6 should be zero. Non-zero reserved bytes from a v1 producer indicate a bug or corruption; consumers may accept and ignore them for forward compatibility.
-7. **UUID version and variant:** the two most significant bits of byte 15 of the decoded array (byte 8 of the UUID payload) must be `10` (the RFC 9562 variant), and the high nibble of byte 13 (byte 6 of the payload) must be a version defined by RFC 9562 (`0x1`–`0x8`). Inputs failing this check must be rejected in version 1. Note that this is a structural check only — it does not require v7. Consumers relying on temporal ordering must additionally inspect the version nibble (see *UUID Payload*).
-
-The CRC algorithm is fixed across all versions of the specification, so step 3 never depends on step 4.
+Steps 1–3 depend only on the invariants, never on the version byte. A production system SHOULD reject the `0xFF` testing codes in steps 5 and 6; a test suite accepts them.
 
 ### Revocation and Deprecation
 
-BMIDs are **never reused or reassigned.** When an entity is withdrawn, merged into another, or otherwise deprecated, its record is marked deprecated and carries a pointer to the canonical successor BMID (if any). The identifier itself remains valid as a historical reference and continues to resolve to its deprecation record.
+BMIDs are **never reused or reassigned.** When an entity is withdrawn, merged, re-typed, or otherwise deprecated, its record is marked deprecated and carries a pointer to the successor BMID, if any. The identifier remains valid as a historical reference and continues to resolve to its deprecation record.
 
-Implementations that resolve BMIDs must distinguish three states: live, deprecated-with-successor, and unknown. Deprecation handling lives in the metadata layer, not in the identifier itself.
+Resolvers MUST distinguish three states: live, deprecated-with-successor, and unknown. Deprecation lives in the metadata layer, not in the identifier.
 
-### Why a Structured Identifier
+---
 
-The most common objection to structured identifiers is that a plain UUID is simpler and sufficient. This argument holds in systems with a single entity type, a single source of truth, and no need for human interaction with identifiers. In a federated book metadata ecosystem, none of these conditions hold:
+## Why a Structured Identifier
 
-- Multiple entity types share the same namespace and must be distinguished without a lookup
-- Multiple partners mint identifiers independently and must be traceable to their source
-- Identifiers appear in UIs, emails, support tickets, and printed materials where transcription matters
-- Data integrity across system boundaries demands built-in error detection
+A plain UUID is simpler and sufficient in a system with one entity type, one source of truth, and no human contact with identifiers. In a federated book metadata ecosystem none of those hold: several entity types share a namespace, several partners mint independently, and identifiers appear in search fields, emails, support tickets, and printed materials.
 
-A BMID is not a replacement for UUID — it *contains* a UUID. It is a thin, fixed-cost envelope around a UUID that adds routing, provenance, diagnostic context, and integrity. The cost is 9 additional bytes. The value is the elimination of multiple auxiliary systems, lookup tables, and failure modes.
+| Capability | BMID | Plain UUID |
+|------------|------|-----------|
+| Entity type known without context | Encoded in the identifier | Requires external context or a lookup |
+| Issuer attribution | Encoded in the identifier | Not carried |
+| Error detection | CRC-16; any error within three adjacent characters is caught | None |
+| Temporal ordering | Same as the payload; v7 recommended, version nibble inspectable | Same; v7 if chosen, version nibble inspectable |
+| Global uniqueness | UUID-based | UUID-based |
+| Transcription | Crockford Base32: no ambiguous characters, case-insensitive | Hex with hyphens: 0/O, 1/l, 8/B confusable |
+| Clustering by type and issuer | In both binary and string form | No |
+| Legacy UUID migration | Deterministic wrap, original recoverable | Identity function |
+| String length | 40 characters | 36 hyphenated, 32 bare |
+| Native database type | None; bytes, string, or decomposed over a UUID column | Ubiquitous |
+| Library support | The decoder in this repository | Every platform |
+| Adoption cost | An encode/decode library; two extra columns or 9 extra bytes per key | None |
+| Re-typing an entity | New identifier plus a deprecation pointer | Not applicable |
+
+The last four rows are where a plain UUID wins. BMID is the right choice when identifiers travel between organizations and through human hands often enough that the first eight rows pay for them.
+
+Two design notes follow from the table. First, a BMID pasted into a search field routes to the right service from its first five characters, with no lookup and no network call. Second, type and issuer make poor *sharding* keys — there are few of them and they are unevenly loaded — so shard on the UUID payload and use the prefix for pruning.
+
+---
+
+## Carrying BMIDs in Existing Formats
+
+BMID requires no new message formats. In every case below the value carried is the canonical 40-character string.
+
+### ONIX for Books 3.x
+
+| Entity | Where | How |
+|--------|-------|-----|
+| Manifestation | `<ProductIdentifier>` | `<ProductIDType>` 01 (proprietary), `<IDTypeName>` `BMID`, `<IDValue>` the BMID |
+| Work | `<RelatedWork>` with `<WorkRelationCode>` 01 (manifestation of), `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Series | `<Collection>`, `<CollectionIdentifier>` | `<CollectionIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Agent (contributor) | `<Contributor>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Agent (publisher, imprint) | `<Publisher>` or `<Imprint>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Subject | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
+| Expression, Item | — | No natural ONIX home; ONIX describes products, not expressions or copies. |
+
+The `<IDTypeName>` and `<SubjectSchemeName>` value is the fixed token `BMID`, per EDItEUR's guidance for proprietary identifiers (*Identifiers in ONIX*, 2025).
+
+### MARC 21
+
+Field `024` with first indicator `7`, `$a` the BMID, and `$2` a source code for BMID, in bibliographic and authority records alike. *[To be decided: register the source code with the Library of Congress Standard Identifier Source Codes list.]*
+
+### RDF and BIBFRAME
+
+Use the HTTP IRI form as the resource IRI, or attach it via `bf:identifiedBy` with an identifier resource whose value is the canonical string. The URN form MAY be used where an IRI is required but resolution is not.
+
+### JSON and other APIs
+
+Carry the canonical string. Never carry the binary form in JSON.
+
+---
+
+## Related Work and Rejected Alternatives
+
+- **UUIDv7 with a type column.** Works inside one system; type and source are lost when the identifier leaves it, and there is no error detection. BMID is this design plus an envelope that keeps the context attached.
+- **ULID.** Same encoding family, no type, issuer, or check bytes, and not an RFC 9562 UUID.
+- **TypeID.** The closest relative: a readable type prefix, an underscore, and a UUIDv7 in 26 Crockford characters. Variable-length, no issuer, no check bytes, no fixed-width binary form. BMID trades the readable prefix for fixed width, provenance, and error detection.
+- **ARK.** Its name assigning authority number plays the role of the issuer byte. ARK is a resolvable URL scheme over variable-length names, not a fixed binary key; a BMID can serve as the name part of an ARK.
+- **DOI and Handle.** Resolution infrastructure with registration agencies and per-identifier fees, suited to published objects rather than to internal entity keys minted at scale.
+- **CRC-32.** Two extra bytes would consume half the reserved headroom for a false-acceptance rate already far below what transcription errors demand.
+- **A check character.** A Damm or Crockford mod-37 symbol detects single errors and adjacent transpositions and nothing else; the CRC detects strictly more for one additional byte.
+- **An environment or partition byte.** Tried and removed. It carried a constant for single-environment partners and baked unstable operational structure into permanent identifiers. Environment belongs in the system that stores the record, not in its key.
+
+---
+
+## Governance
+
+*[Items marked "to be decided" need an answer before v1.0 is final.]*
+
+- **Owner.** *[To be decided: the consortium body or lead organization that owns this specification and its registries.]*
+- **Registry maintenance.** This repository is the registry. Allocation requests are pull requests against this document. *[To be decided: the maintainers who review them, and the review period.]*
+- **Issuer allocation criteria.** The requesting organization maintains entity records on its own authority, provides an organizational contact, and agrees to the wrap-once rule and to never reusing an identifier.
+- **Entity type allocation criteria.** As stated in *Entity Type Registry*.
+- **Change policy.** Registries are append-only. A change to any normative section that alters which inputs are accepted, or what they mean, is a new version and takes a new version byte. Editorial changes and additions to informative sections do not.
+- **License.** *[To be decided. CC BY 4.0 for this document and Apache-2.0 or MIT for reference code are the conventional choices.]*
 
 ---
 
 ## Security Considerations
 
-The CRC-16 check bytes are designed for error detection, not security. They do not protect against deliberate tampering. If cryptographic integrity is required, implementations should layer HMAC or digital signatures over the BMID rather than extending the identifier itself.
+The check bytes detect errors, not tampering. Where cryptographic integrity is required, layer HMAC or signatures over the BMID rather than extending it.
 
-The vendor ID field is informational and must not be treated as an access control mechanism. Authorization decisions must be made by the receiving system based on its own trust model.
+The issuer ID is informational and MUST NOT be used as an access control mechanism. It also discloses the original minter, which may be commercially sensitive; partners exposing BMIDs externally should consider whether that is acceptable.
 
-The vendor ID field reveals the original minter of an identifier, which may carry commercial sensitivity (sourcing relationships, catalog provenance). Partners exposing BMIDs to external consumers should consider whether this disclosure is acceptable in their use case.
-
-A UUIDv7 payload reveals the millisecond timestamp at which the identifier was minted. This is generally not sensitive for book metadata but should be considered for embargoed or pre-announcement workflows. Wrapped legacy payloads reveal whatever their original UUID version encodes (a v1 UUID, for example, embeds a timestamp and historically a MAC address).
+A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payloads disclose whatever their original version encodes; a v1 UUID embeds a timestamp and historically a MAC address.
 
 ---
 
-## Glossary
+## Tools
 
-| Term | Definition |
-|------|------------|
-| **BMID** | Book Metadata Identifier. The structured identifier format specified in this document. |
-| **LRM** | IFLA Library Reference Model. The conceptual model for bibliographic entities (Work, Expression, Manifestation, Item, Agent). |
-| **Crockford Base32** | A base-32 encoding alphabet designed by Douglas Crockford. Uses 0–9 and A–Z excluding I, L, O, U. |
-| **CRC-16/XMODEM** | A 16-bit cyclic redundancy check with polynomial `0x1021`, initial value `0x0000`, and no input/output reflection. Used by BMID for error detection over the first 23 bytes. |
-| **UUIDv7** | A UUID version defined in RFC 9562 that embeds a Unix millisecond timestamp for temporal ordering. The recommended payload for newly minted BMIDs. |
-| **Wrapping** | Minting a BMID whose payload is a pre-existing UUID, verbatim. Deterministic; the original UUID is recoverable from bytes 7–22. |
-| **Vendor ID** | A 1-byte identifier assigned from the central registry to a partner organization that mints BMIDs. |
-| **Minter** | The vendor that originally created a BMID. Identified by the vendor ID field. Distinct from current custodian. |
-| **Custodian** | The current owner of a record. Tracked outside the BMID in mutable metadata. |
+- `test-vectors.json` — the conformance suite: valid identifiers with decoded fields, normalization cases, and invalid inputs keyed to the validation step that rejects them.
+- `tools/bmid-decoder.html` — a browser bookmarklet that normalizes, validates, and decodes a BMID.
+
+---
+
+## Changelog
+
+- **2026-09-30** — Editorial. Condensed the whole document; merged *The Problem with Plain UUIDs* and *Key Advantages* into *Why a Structured Identifier*; removed the glossary. Explained why the identifier is 25 bytes. No normative change.
+- **2026-09-24** — Renamed the vendor field to *Issuer ID*. Added *Conformance*, *Invariants Across Versions*, *Version Registry*, *HTTP IRI Form*, *Carrying BMIDs in Existing Formats*, *Related Work and Rejected Alternatives*, *Governance*, and *Tools*. Specified Base32 bit packing, the URN prefix in normalization, and Unicode whitespace. Made non-zero reserved bytes and unknown versions a hard reject. Added the decomposed storage strategy, the binary-collation requirement, the entity type criterion and immutability rule, and what cannot be wrapped. Stated the CRC guarantee precisely. Rebalanced the comparison table. Added `test-vectors.json`.
+- **2026-07-30** — Removed the environment/partition byte; bytes 3–6 are reserved and zero. Allowed any RFC 9562 UUID as payload to support wrapping. Made normalization mandatory, registries append-only, and documented the sort-order guarantee.
+- **2026-04-22** — Initial draft.

@@ -1,0 +1,239 @@
+{
+  "spec": "BMID v1.0 draft",
+  "generated": "2026-09-24",
+  "description": "Conformance vectors. 'valid' inputs must be accepted and decode to the listed fields. 'normalization' inputs must normalize to the listed canonical form. 'invalid' inputs must be rejected at the listed validation step. 'test_context_only' inputs are accepted only when testing codes (0xFF) are allowed.",
+  "crc16_xmodem": {
+    "input": "123456789",
+    "crc": "31C3"
+  },
+  "valid": [
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "bytes": "0103FF00000000018F2D4A8C0071239A2B3C4D5E6F7A8B72B7",
+      "version": 1,
+      "entity_type": 3,
+      "issuer": 255,
+      "uuid": "018f2d4a-8c00-7123-9a2b-3c4d5e6f7a8b",
+      "uuid_version": 7,
+      "crc": "72B7",
+      "note": "Spec worked example: Manifestation, testing issuer, UUIDv7 payload."
+    },
+    {
+      "input": "042ZY000000F8YP11DCCRGVJMNKGW0NJRFA7JRJ4",
+      "canonical": "042ZY000000F8YP11DCCRGVJMNKGW0NJRFA7JRJ4",
+      "bytes": "0105FF00000000F47AC10B58CC4372A5670E02B2C3D4796244",
+      "version": 1,
+      "entity_type": 5,
+      "issuer": 255,
+      "uuid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "uuid_version": 4,
+      "crc": "6244",
+      "note": "Spec worked example: Agent, testing issuer, wrapped UUIDv4 payload."
+    },
+    {
+      "input": "040G2000000034GA7WF5RZ9YH8DJRFAEBXG7221W",
+      "canonical": "040G2000000034GA7WF5RZ9YH8DJRFAEBXG7221W",
+      "bytes": "0101010000000001920A3F1E5C7D3E8A1B2C3D4E5F6071083C",
+      "version": 1,
+      "entity_type": 1,
+      "issuer": 1,
+      "uuid": "01920a3f-1e5c-7d3e-8a1b-2c3d4e5f6071",
+      "uuid_version": 7,
+      "crc": "083C",
+      "note": "Work, unallocated issuer 0x01, UUIDv7. Exercises the 'unallocated code MAY be accepted' path of steps 5-6."
+    },
+    {
+      "input": "043QY0000006Q9XR22ETT4EHG2T01G2FTGRCHPCS",
+      "canonical": "043QY0000006Q9XR22ETT4EHG2T01G2FTGRCHPCS",
+      "bytes": "01077F000000006BA7B8109DAD11D180B400C04FD430C8D999",
+      "version": 1,
+      "entity_type": 7,
+      "issuer": 127,
+      "uuid": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "uuid_version": 1,
+      "crc": "D999",
+      "note": "Subject, unallocated issuer 0x7F, wrapped UUIDv1 payload. Structural check passes; no temporal ordering."
+    },
+    {
+      "input": "060FW000000034GA7WF5RZ9YH8DJRFAEBXG73DVB",
+      "canonical": "060FW000000034GA7WF5RZ9YH8DJRFAEBXG73DVB",
+      "bytes": "0180FE0000000001920A3F1E5C7D3E8A1B2C3D4E5F6071B76B",
+      "version": 1,
+      "entity_type": 128,
+      "issuer": 254,
+      "uuid": "01920a3f-1e5c-7d3e-8a1b-2c3d4e5f6071",
+      "uuid_version": 7,
+      "crc": "B76B",
+      "note": "Extension entity type 0x80 (unallocated), issuer 0xFE. MAY be accepted with a warning."
+    }
+  ],
+  "normalization": [
+    {
+      "input": "041zy000000033sd9a600w93k8nkrkaydxx8pwnq",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "Lowercase input folds to uppercase."
+    },
+    {
+      "input": "041ZY000-000033SD-9A600W93-K8NKRKAY-DXX8PWNQ",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "Hyphens are stripped."
+    },
+    {
+      "input": "  041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ\n",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "Leading and trailing whitespace is stripped."
+    },
+    {
+      "input": "urn:bmid:041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "URN prefix is removed."
+    },
+    {
+      "input": "URN:BMID:041zy000000033sd9a600w93k8nkrkaydxx8pwnq",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "URN prefix is case-insensitive."
+    },
+    {
+      "input": "O4lZYOO0000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "l maps to 1 and O maps to 0."
+    },
+    {
+      "input": "o4IZYo00000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "I maps to 1 and o maps to 0 (after case folding)."
+    },
+    {
+      "input": " urn:BMID:041zy-00000-0033s-d9a60-0w93k-8nkrk-aydxx-8pwnq ",
+      "canonical": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "All rules at once: Unicode whitespace, URN prefix, hyphens, lowercase."
+    }
+  ],
+  "invalid": [
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWN",
+      "step": 1,
+      "reason": "length",
+      "note": "39 characters."
+    },
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ0",
+      "step": 1,
+      "reason": "length",
+      "note": "41 characters."
+    },
+    {
+      "input": "",
+      "step": 1,
+      "reason": "length",
+      "note": "Empty string."
+    },
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNU",
+      "step": 2,
+      "reason": "charset",
+      "note": "U is not in the alphabet and is not mapped."
+    },
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWN*",
+      "step": 2,
+      "reason": "charset",
+      "note": "Symbol outside the alphabet."
+    },
+    {
+      "input": "041ZY000000033SD9A60 W93K8NKRKAYDXX8PWNQ",
+      "step": 2,
+      "reason": "charset",
+      "note": "Interior whitespace is not stripped and is not a valid character."
+    },
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNR",
+      "step": 3,
+      "reason": "crc",
+      "note": "Last character changed; CRC mismatch."
+    },
+    {
+      "input": "041ZY000000033DS9A600W93K8NKRKAYDXX8PWNQ",
+      "step": 3,
+      "reason": "crc",
+      "note": "Adjacent characters transposed; CRC mismatch."
+    },
+    {
+      "input": "001ZY000000033SD9A600W93K8NKRKAYDXX8P5XW",
+      "step": 4,
+      "reason": "version",
+      "note": "Version 0x00 with a valid CRC."
+    },
+    {
+      "input": "081ZY000000033SD9A600W93K8NKRKAYDXX8QQDA",
+      "step": 4,
+      "reason": "version",
+      "note": "Version 0x02 with a valid CRC; unknown to a v1 implementation."
+    },
+    {
+      "input": "040FY000000033SD9A600W93K8NKRKAYDXX8QH6Z",
+      "step": 5,
+      "reason": "entity_type",
+      "note": "Entity type 0x00."
+    },
+    {
+      "input": "041G0000000033SD9A600W93K8NKRKAYDXX8P6ND",
+      "step": 6,
+      "reason": "issuer",
+      "note": "Issuer 0x00."
+    },
+    {
+      "input": "041ZY000000G33SD9A600W93K8NKRKAYDXX8PRJN",
+      "step": 7,
+      "reason": "reserved",
+      "note": "Non-zero reserved byte with a valid CRC."
+    },
+    {
+      "input": "041ZY00000000000000000000000000000001EVS",
+      "step": 8,
+      "reason": "uuid",
+      "note": "Nil UUID: variant bits 00, version nibble 0."
+    },
+    {
+      "input": "041ZY000000FZZZZZZZZZZZZZZZZZZZZZZZZZESR",
+      "step": 8,
+      "reason": "uuid",
+      "note": "Max UUID: variant bits 11, version nibble F."
+    },
+    {
+      "input": "041ZY000000033SD9A600W93S8NKRKAYDXX8QEEK",
+      "step": 8,
+      "reason": "uuid",
+      "note": "Variant bits 11 (Microsoft GUID variant)."
+    },
+    {
+      "input": "041ZY000000033SD9A601493K8NKRKAYDXX8QQCM",
+      "step": 8,
+      "reason": "uuid",
+      "note": "Version nibble 9 is not defined by RFC 9562."
+    },
+    {
+      "input": "041ZY000000033SD9A600093K8NKRKAYDXX8QB9P",
+      "step": 8,
+      "reason": "uuid",
+      "note": "Version nibble 0 is not defined by RFC 9562."
+    },
+    {
+      "input": "0000000000000000000000000000000000000000",
+      "step": 4,
+      "reason": "version",
+      "note": "All zeros is CRC-valid under XMODEM and fails at the version check."
+    }
+  ],
+  "test_context_only": [
+    {
+      "input": "041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ",
+      "note": "Issuer 0xFF is accepted in a test context and SHOULD be rejected in production (step 6)."
+    },
+    {
+      "input": "07ZG2000000033SD9A600W93K8NKRKAYDXX8Q3MX",
+      "note": "Entity type 0xFF is accepted in a test context and SHOULD be rejected in production (step 5)."
+    }
+  ]
+}
