@@ -18,7 +18,9 @@ BMID is designed for a consortium of partner organizations that independently mi
 
 BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, and Subjects. It does not replace ISBN, ISTC, ISNI, or DOI; those are carried as parallel metadata.
 
-BMIDs are minted by registered **issuers**: metadata aggregators, national bibliographic agencies, large retailers, and similar organizations that maintain entity records on their own authority. Publishers, imprints, and contributors are described *by* BMID-identified records; they do not mint.
+BMIDs are minted by registered **issuers**: metadata aggregators, national bibliographic agencies, publishers, retailers, and similar organizations that maintain entity records on their own authority.
+
+An organization without its own issuer code mints through an existing issuer, typically its national agency or an aggregator, as ISBN and DOI registrants do through their agencies. The issuer ID then names the issuer that minted on its behalf, and the publisher is recorded in metadata. An organization that later receives its own code keeps its earlier BMIDs unchanged: the issuer ID is provenance, not ownership. Delegation keeps the number of issuers, and of resolvers, proportionate to the organizations that run their own infrastructure, without limiting who can mint.
 
 ---
 
@@ -117,7 +119,7 @@ https://id.bmid.example/041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10F
 
 *[To be decided: the host is a domain owned by the consortium, fixed by this specification once chosen.]*
 
-Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is specified in a companion document. The issuer ID identifies the organization whose resolver is authoritative for an identifier.
+Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is specified in a companion document. The issuer ID identifies the organization whose resolver is authoritative for an identifier. Because version, entity type, and issuer occupy exactly the first eight characters, the consortium host can route every request on that prefix, so a client needs one host regardless of how many issuers exist.
 
 ---
 
@@ -373,7 +375,7 @@ Carry the canonical string. Never carry the binary form in JSON.
 
 - **Owner.** *[To be decided: the consortium body or lead organization that owns this specification and its registries.]*
 - **Registry maintenance.** This repository is the registry. Allocation requests are pull requests against this document. *[To be decided: the maintainers who review them, and the review period.]*
-- **Issuer allocation criteria.** The requesting organization maintains entity records on its own authority, provides an organizational contact, and agrees to the wrap-once rule and to never reusing an identifier.
+- **Issuer allocation criteria.** The requesting organization maintains entity records on its own authority, operates or contracts a resolver endpoint for the identifiers it mints, provides an organizational contact, and agrees to the wrap-once rule and to never reusing an identifier. Organizations that do not meet these criteria mint through an existing issuer (see *Scope*).
 - **Entity type allocation criteria.** As stated in *Entity Type Registry*.
 - **Change policy.** Registries are append-only. A change to any normative section that alters which inputs are accepted, or what they mean, is a new version and takes a new version byte. Editorial changes and additions to informative sections do not.
 - **License.** *[To be decided. CC BY 4.0 for this document and Apache-2.0 or MIT for reference code are the conventional choices.]*
@@ -399,6 +401,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-27** — Added delegated minting: organizations without an issuer code mint through an existing issuer. Publishers may now hold issuer codes. Issuers must operate or contract a resolver endpoint, and the consortium host routes on the eight-character prefix. No change to the byte layout or validation.
 - **2026-10-27** — Widened the Issuer ID from 1 to 3 bytes (offsets 2–4, big-endian), raising the lifetime budget from 254 to 16,777,214 codes; the testing issuer is now `0xFFFFFF`. The reserved block shrinks to bytes 5–6, and the first eight characters now encode exactly version, entity type, and issuer. Worked examples and `test-vectors.json` regenerated. Breaking change to the draft layout; no issuers were allocated.
 - **2026-09-30** — Editorial. Condensed the whole document; merged *The Problem with Plain UUIDs* and *Key Advantages* into *Why a Structured Identifier*; removed the glossary. Explained why the identifier is 25 bytes. No normative change.
 - **2026-09-24** — Renamed the vendor field to *Issuer ID*. Added *Conformance*, *Invariants Across Versions*, *Version Registry*, *HTTP IRI Form*, *Carrying BMIDs in Existing Formats*, *Related Work and Rejected Alternatives*, *Governance*, and *Tools*. Specified Base32 bit packing, the URN prefix in normalization, and Unicode whitespace. Made non-zero reserved bytes and unknown versions a hard reject. Added the decomposed storage strategy, the binary-collation requirement, the entity type criterion and immutability rule, and what cannot be wrapped. Stated the CRC guarantee precisely. Rebalanced the comparison table. Added `test-vectors.json`.
