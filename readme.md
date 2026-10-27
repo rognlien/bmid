@@ -2,7 +2,7 @@
 
 **A structured, self-describing identifier for LRM entities**
 
-Specification v1.0 — DRAFT | September 2026
+Specification v1.0 — DRAFT | October 2026
 
 ---
 
@@ -40,14 +40,14 @@ A conforming implementation accepts exactly the inputs this specification accept
 |--------|-------|------|-------------|
 | 0 | **Version** | 1 byte | BMID format version. See *Version Registry*. |
 | 1 | **Entity Type** | 1 byte | LRM entity class. See *Entity Type Registry*. |
-| 2 | **Issuer ID** | 1 byte | Organization that minted the identifier. See *Issuer Registry*. |
-| 3–6 | **Reserved** | 4 bytes | MUST be all zero in version 1. Headroom for future versions (e.g. a wider issuer field). |
+| 2–4 | **Issuer ID** | 3 bytes | Organization that minted the identifier, big-endian. See *Issuer Registry*. |
+| 5–6 | **Reserved** | 2 bytes | MUST be all zero in version 1. Headroom for future versions. |
 | 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 RECOMMENDED for new mints. |
 | 23–24 | **Check Bytes** | 2 bytes | CRC-16/XMODEM over bytes 0–22, big-endian. |
 
 **Total:** 25 bytes = 200 bits = 40 [Crockford Base32](#crockford-base32) characters.
 
-The fields carry 21 bytes of information. 168 bits does not divide into 5-bit characters; 25 bytes is the smallest size that does. The surplus is held as reserved bytes rather than padding, and the non-UUID fields lead so that the decoded bytes cluster by version, type, and issuer.
+The fields carry 23 bytes of information. 184 bits does not divide into 5-bit characters; 25 bytes is the smallest size that does. The surplus is held as reserved bytes rather than padding, and the non-UUID fields lead so that the decoded bytes cluster by version, type, and issuer.
 
 ### Canonical Form
 
@@ -57,42 +57,42 @@ There is no hyphenated or segmented display form. Field boundaries fall on byte 
 
 Two visible consequences of the layout:
 
-- The first five characters are the 24 bits of version, entity type, and issuer plus one reserved zero bit. A prefix filter on them selects exactly one (version, entity type, issuer) combination. Version 1 with a core entity type begins `04`.
-- Characters 6–11 are `0` in every version 1 BMID (the reserved bytes). For a UUIDv7 payload character 12 is also `0`, since the top four bits of the millisecond timestamp stay zero until 2527.
+- The first eight characters are exactly the 40 bits of version, entity type, and issuer. A prefix filter on them selects exactly one (version, entity type, issuer) combination. Version 1 with a core entity type begins `04`.
+- Characters 9–11 are `0` in every version 1 BMID (the reserved bytes). For a UUIDv7 payload character 12 is also `0`, since the top four bits of the millisecond timestamp stay zero until 2527.
 
 ### Worked Example
 
-A Manifestation minted by the testing issuer (`0xFF`):
+A Manifestation minted by the testing issuer (`0xFFFFFF`):
 
 ```
-041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
+041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10F
 ```
 
 Decoded bytes (hex):
 
 ```
-01 03 FF 00 00 00 00  01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B  72 B7
+01 03 FF FF FF 00 00  01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B  84 0F
 ```
 
 | Bytes | Value | Meaning |
 |-------|-------|---------|
 | `[0]` | `0x01` | Version = 1 |
 | `[1]` | `0x03` | Entity type = Manifestation |
-| `[2]` | `0xFF` | Issuer ID = testing |
-| `[3–6]` | `0x00 0x00 0x00 0x00` | Reserved |
+| `[2–4]` | `0xFF 0xFF 0xFF` | Issuer ID = testing |
+| `[5–6]` | `0x00 0x00` | Reserved |
 | `[7–22]` | `01 8F 2D 4A 8C 00 71 23 9A 2B 3C 4D 5E 6F 7A 8B` | UUIDv7 payload |
-| `[23–24]` | `0x72 0xB7` | CRC-16/XMODEM = `0x72B7` |
+| `[23–24]` | `0x84 0x0F` | CRC-16/XMODEM = `0x840F` |
 
 ### Worked Example — Wrapped Legacy UUID
 
 An Agent whose pre-existing UUIDv4 `f47ac10b-58cc-4372-a567-0e02b2c3d479` is wrapped by the testing issuer:
 
 ```
-042ZY000000F8YP11DCCRGVJMNKGW0NJRFA7JRJ4
+042ZZZZZ000F8YP11DCCRGVJMNKGW0NJRFA7K57W
 ```
 
 ```
-01 05 FF 00 00 00 00  F4 7A C1 0B 58 CC 43 72 A5 67 0E 02 B2 C3 D4 79  62 44
+01 05 FF FF FF 00 00  F4 7A C1 0B 58 CC 43 72 A5 67 0E 02 B2 C3 D4 79  94 FC
 ```
 
 Bytes 7–22 are the original UUID verbatim. Its version nibble (`4` in byte 13) tells any consumer that this payload carries no timestamp.
@@ -102,7 +102,7 @@ Bytes 7–22 are the original UUID verbatim. Its version nibble (`4` in byte 13)
 A BMID MAY be expressed as `urn:bmid:<canonical form>`:
 
 ```
-urn:bmid:041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
+urn:bmid:041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10F
 ```
 
 The `urn:` and `bmid:` prefixes are case-insensitive (RFC 8141). The `bmid` namespace is not registered with IANA, so this form is informal. The canonical 40-character form is authoritative.
@@ -112,12 +112,12 @@ The `urn:` and `bmid:` prefixes are case-insensitive (RFC 8141). The `bmid` name
 For RDF, BIBFRAME, and any context that needs a resolvable identifier, a BMID MAY be expressed as an HTTP IRI whose final path segment is the canonical form. This is the RECOMMENDED form for linked data.
 
 ```
-https://id.bmid.example/041ZY000000033SD9A600W93K8NKRKAYDXX8PWNQ
+https://id.bmid.example/041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10F
 ```
 
 *[To be decided: the host is a domain owned by the consortium, fixed by this specification once chosen.]*
 
-Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is specified in a companion document. The issuer byte identifies the organization whose resolver is authoritative for an identifier.
+Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is specified in a companion document. The issuer ID identifies the organization whose resolver is authoritative for an identifier.
 
 ---
 
@@ -176,15 +176,15 @@ The list is pragmatic rather than a transcription of LRM. Series and Subject get
 
 | Code | Issuer |
 |------|--------|
-| `0x00` | *Reserved — invalid.* MUST be rejected. |
-| `0x01–0xFE` | *Available — registry-assigned.* |
-| `0xFF` | *Reserved for testing and examples.* SHOULD be rejected outside test contexts. |
+| `0x000000` | *Reserved — invalid.* MUST be rejected. |
+| `0x000001–0xFFFFFE` | *Available — registry-assigned.* |
+| `0xFFFFFF` | *Reserved for testing and examples.* SHOULD be rejected outside test contexts. |
 
 (No partner organizations are allocated in this draft.)
 
 The issuer ID identifies the **minter** at the moment of creation. It is provenance, not current custody. Systems that track custody (after acquisitions, rights transfers, or catalog resale) MUST carry it in a separate mutable metadata field.
 
-Because registries are append-only, the 254 assignable codes are a lifetime budget covering every allocation ever made. Should it approach exhaustion, the reserved bytes allow a future version to widen the field without changing the length.
+Because registries are append-only, the 16,777,214 assignable codes are a lifetime budget covering every allocation ever made.
 
 ---
 
@@ -252,8 +252,8 @@ The 16-byte payload is any valid **RFC 9562 UUID**. Validators enforce the varia
 
 Wrapping is deterministic: the same version, entity type, issuer, and UUID always yield the same BMID.
 
-- **Wrap once.** The partner that owns the legacy record mints the wrap. Two partners MUST NOT independently wrap the same UUID; different issuer bytes would yield two BMIDs for one entity. Agree on a single wrapping authority per corpus before migration.
-- **The issuer byte identifies the wrapping organization,** not whoever generated the legacy UUID.
+- **Wrap once.** The partner that owns the legacy record mints the wrap. Two partners MUST NOT independently wrap the same UUID; different issuer IDs would yield two BMIDs for one entity. Agree on a single wrapping authority per corpus before migration.
+- **The issuer ID identifies the wrapping organization,** not whoever generated the legacy UUID.
 
 **What cannot be wrapped.** The Nil UUID, the Max UUID, GUIDs using the Microsoft or NCS variant, and arbitrary 128-bit values without RFC 9562 version and variant bits fail structural validation. Such identifiers must be re-keyed with a fresh UUIDv7 and a mapping table maintained by the issuer.
 
@@ -282,11 +282,11 @@ A conforming implementation MUST validate the following on input, in this order:
 3. **CRC:** decode, recompute CRC-16/XMODEM over bytes 0–22, and compare to bytes 23–24. On mismatch, reject.
 4. **Version:** byte 0 MUST be a version this implementation understands. A version 1 implementation accepts only `0x01`; `0x00` and `0x02–0xFF` MUST be rejected.
 5. **Entity type:** byte 1 MUST NOT be `0x00`. `0xFF` SHOULD be rejected outside test contexts. Reserved or unallocated codes MAY be accepted, optionally with a warning, so that newly registered types are not rejected by older consumers.
-6. **Issuer ID:** byte 2 MUST NOT be `0x00`. `0xFF` SHOULD be rejected outside test contexts. Unallocated codes MAY be accepted, optionally with a warning.
-7. **Reserved bytes:** bytes 3–6 MUST all be `0x00`. Otherwise reject. A future version that assigns meaning to these bytes changes the version byte.
+6. **Issuer ID:** bytes 2–4, read as a big-endian integer, MUST NOT be `0x000000`. `0xFFFFFF` SHOULD be rejected outside test contexts. Unallocated codes MAY be accepted, optionally with a warning.
+7. **Reserved bytes:** bytes 5–6 MUST both be `0x00`. Otherwise reject. A future version that assigns meaning to these bytes changes the version byte.
 8. **UUID version and variant:** the two most significant bits of byte 15 (byte 8 of the payload) MUST be `10`, and the high nibble of byte 13 (byte 6 of the payload) MUST be `0x1`–`0x8`. Otherwise reject. This is a structural check only; it does not require v7.
 
-Steps 1–3 depend only on the invariants, never on the version byte. A production system SHOULD reject the `0xFF` testing codes in steps 5 and 6; a test suite accepts them.
+Steps 1–3 depend only on the invariants, never on the version byte. A production system SHOULD reject the testing codes (`0xFF` in step 5, `0xFFFFFF` in step 6); a test suite accepts them.
 
 ### Revocation and Deprecation
 
@@ -318,7 +318,7 @@ A plain UUID is simpler and sufficient in a system with one entity type, one sou
 
 The last four rows are where a plain UUID wins. BMID is the right choice when identifiers travel between organizations and through human hands often enough that the first eight rows pay for them.
 
-Two design notes follow from the table. First, a BMID pasted into a search field routes to the right service from its first five characters, with no lookup and no network call. Second, type and issuer make poor *sharding* keys — there are few of them and they are unevenly loaded — so shard on the UUID payload and use the prefix for pruning.
+Two design notes follow from the table. First, a BMID pasted into a search field routes to the right service from its first eight characters, with no lookup and no network call. Second, type and issuer make poor *sharding* keys — they are unevenly loaded — so shard on the UUID payload and use the prefix for pruning.
 
 ---
 
@@ -359,9 +359,9 @@ Carry the canonical string. Never carry the binary form in JSON.
 - **UUIDv7 with a type column.** Works inside one system; type and source are lost when the identifier leaves it, and there is no error detection. BMID is this design plus an envelope that keeps the context attached.
 - **ULID.** Same encoding family, no type, issuer, or check bytes, and not an RFC 9562 UUID.
 - **TypeID.** The closest relative: a readable type prefix, an underscore, and a UUIDv7 in 26 [Crockford](#crockford-base32) characters. Variable-length, no issuer, no check bytes, no fixed-width binary form. BMID trades the readable prefix for fixed width, provenance, and error detection.
-- **ARK.** Its name assigning authority number plays the role of the issuer byte. ARK is a resolvable URL scheme over variable-length names, not a fixed binary key; a BMID can serve as the name part of an ARK.
+- **ARK.** Its name assigning authority number plays the role of the issuer ID. ARK is a resolvable URL scheme over variable-length names, not a fixed binary key; a BMID can serve as the name part of an ARK.
 - **DOI and Handle.** Resolution infrastructure with registration agencies and per-identifier fees, suited to published objects rather than to internal entity keys minted at scale.
-- **CRC-32.** Two extra bytes would consume half the reserved headroom for a false-acceptance rate already far below what transcription errors demand.
+- **CRC-32.** Two extra bytes would consume all the reserved headroom for a false-acceptance rate already far below what transcription errors demand.
 - **A check character.** A Damm or [Crockford](#crockford-base32) mod-37 symbol detects single errors and adjacent transpositions and nothing else; the CRC detects strictly more for one additional byte.
 - **An environment or partition byte.** Tried and removed. It carried a constant for single-environment partners and baked unstable operational structure into permanent identifiers. Environment belongs in the system that stores the record, not in its key.
 
@@ -399,6 +399,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-27** — Widened the Issuer ID from 1 to 3 bytes (offsets 2–4, big-endian), raising the lifetime budget from 254 to 16,777,214 codes; the testing issuer is now `0xFFFFFF`. The reserved block shrinks to bytes 5–6, and the first eight characters now encode exactly version, entity type, and issuer. Worked examples and `test-vectors.json` regenerated. Breaking change to the draft layout; no issuers were allocated.
 - **2026-09-30** — Editorial. Condensed the whole document; merged *The Problem with Plain UUIDs* and *Key Advantages* into *Why a Structured Identifier*; removed the glossary. Explained why the identifier is 25 bytes. No normative change.
 - **2026-09-24** — Renamed the vendor field to *Issuer ID*. Added *Conformance*, *Invariants Across Versions*, *Version Registry*, *HTTP IRI Form*, *Carrying BMIDs in Existing Formats*, *Related Work and Rejected Alternatives*, *Governance*, and *Tools*. Specified Base32 bit packing, the URN prefix in normalization, and Unicode whitespace. Made non-zero reserved bytes and unknown versions a hard reject. Added the decomposed storage strategy, the binary-collation requirement, the entity type criterion and immutability rule, and what cannot be wrapped. Stated the CRC guarantee precisely. Rebalanced the comparison table. Added `test-vectors.json`.
 - **2026-07-30** — Removed the environment/partition byte; bytes 3–6 are reserved and zero. Allowed any RFC 9562 UUID as payload to support wrapping. Made normalization mandatory, registries append-only, and documented the sort-order guarantee.
