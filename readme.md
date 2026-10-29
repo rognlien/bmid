@@ -172,6 +172,8 @@ The list is pragmatic rather than a transcription of LRM. Series and Subject get
 
 **Criterion for a new type.** A code is allocated for a class that is *independently resolvable*: it has its own records and its own lookup path. A distinction expressed as an attribute of an existing class (Person versus Collective Agent, print versus digital Manifestation) belongs in metadata, not in the type byte.
 
+**Modeling practice is not a type.** Cataloguing practices differ on where one entity ends and the next begins: some agencies create a new Work for a translation, others add a new Expression to the original Work. Such differences in granularity are not grounds for a new code. Records made under different practices are reconciled through relationships in the metadata, such as translation-of or equivalence links, not through the type byte.
+
 **The entity type is immutable.** A record minted with the wrong type MUST be deprecated in favour of a new BMID of the correct type (see *Revocation and Deprecation*). Issuers SHOULD mint only once an entity's class is settled.
 
 ### Issuer Registry
@@ -187,6 +189,8 @@ The list is pragmatic rather than a transcription of LRM. Series and Subject get
 The issuer ID identifies the **minter** at the moment of creation. It is provenance, not current custody. Systems that track custody (after acquisitions, rights transfers, or catalog resale) MUST carry it in a separate mutable metadata field.
 
 Because registries are append-only, the 16,777,214 assignable codes are a lifetime budget covering every allocation ever made.
+
+**Modeling profile.** An allocation request MAY state the issuer's modeling profile: how it draws entity boundaries where practice varies, for example whether a translation is a new Work or a new Expression of the original Work. The profile is recorded with the issuer's entry, dated, and updated by pull request when the issuer's practice changes. It describes the issuer's records and does not change the meaning of any entity type; individual records MAY state a different practice in their metadata.
 
 ---
 
@@ -401,6 +405,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-29** — Stated that modeling practice, such as translation-as-Work, is not grounds for a new entity type, and added an optional modeling profile to issuer registry entries. No change to the byte layout or validation.
 - **2026-10-27** — Added delegated minting: organizations without an issuer code mint through an existing issuer. Publishers may now hold issuer codes. Issuers must operate or contract a resolver endpoint, and the consortium host routes on the eight-character prefix. No change to the byte layout or validation.
 - **2026-10-27** — Widened the Issuer ID from 1 to 3 bytes (offsets 2–4, big-endian), raising the lifetime budget from 254 to 16,777,214 codes; the testing issuer is now `0xFFFFFF`. The reserved block shrinks to bytes 5–6, and the first eight characters now encode exactly version, entity type, and issuer. Worked examples and `test-vectors.json` regenerated. Breaking change to the draft layout; no issuers were allocated.
 - **2026-09-30** — Editorial. Condensed the whole document; merged *The Problem with Plain UUIDs* and *Key Advantages* into *Why a Structured Identifier*; removed the glossary. Explained why the identifier is 25 bytes. No normative change.
