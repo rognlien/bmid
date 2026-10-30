@@ -16,13 +16,13 @@ BMID is designed for a consortium of partner organizations that independently mi
 
 ## Scope
 
-BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, Topics, and Places. It does not replace ISBN, ISNI, or DOI; those are carried as parallel metadata.
+BMID identifies Works, Expressions, Manifestations, Items, Agents, Series, Topics, and Places: entity types for which no standard identifier is universal. It does not replace ISBN, ISNI, or DOI where an entity has one; those are carried as parallel metadata.
 
-Works and Expressions have no active standard identifier. The International Standard Text Code (ISTC, ISO 21047), which identified textual works, was withdrawn in 2021: its registration agency ceased operating, no successor was found, and existing registrations are no longer accessible. Legacy ISTCs MAY still be carried as parallel metadata where records hold them.
+Works and Expressions have no active standard identifier. The International Standard Text Code (ISTC, ISO 21047), which identified textual works, was withdrawn in 2021: its registration agency ceased operating, no successor was found, and existing registrations are no longer accessible. Legacy ISTCs can still be carried as parallel metadata where records hold them.
 
 BMIDs are minted by registered **issuers**: metadata aggregators, national bibliographic agencies, publishers, retailers, and similar organizations that maintain entity records on their own authority.
 
-An organization without its own issuer code mints through an existing issuer, typically its national agency or an aggregator, as ISBN and DOI registrants do through their agencies. The issuer ID then names the issuer that minted on its behalf, and the publisher is recorded in metadata. An organization that later receives its own code keeps its earlier BMIDs unchanged: the issuer ID is provenance, not ownership. Delegation keeps the number of issuers, and of resolvers, proportionate to the organizations that run their own infrastructure, without limiting who can mint.
+An organization without its own issuer code mints through an existing issuer, typically its national agency or an aggregator, as ISBN and DOI registrants do through their agencies. The issuer ID then names the issuer that minted on its behalf, and the delegating organization is recorded in metadata. An organization that later receives its own code keeps its earlier BMIDs unchanged: the issuer ID is provenance, not ownership. Delegation keeps the number of issuers, and of resolvers, proportionate to the organizations that run their own infrastructure, without limiting who can mint.
 
 ---
 
@@ -30,9 +30,11 @@ An organization without its own issuer code mints through an existing issuer, ty
 
 The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RECOMMENDED, NOT RECOMMENDED, MAY, and OPTIONAL in this document are to be interpreted as described in BCP 14 (RFC 2119, RFC 8174) when, and only when, they appear in all capitals.
 
-The sections *Identifier Structure*, *Invariants Across Versions*, *Registries*, *Encoding*, *Storage*, and *Validation* are **normative**. All other sections are informative.
+The sections *Identifier Structure*, *Invariants Across Versions*, *Registries*, *Encoding*, *Storage*, *Validation*, and *Revocation and Deprecation* are **normative**. All other sections are informative.
 
-A conforming implementation accepts exactly the inputs this specification accepts, rejects exactly the inputs it rejects, and produces canonical output as defined here. It MUST pass every vector in `test-vectors.json`.
+A conforming implementation accepts every input this specification requires it to accept, rejects every input it requires it to reject, and produces canonical output as defined here. Where this specification says an input MAY be accepted, the choice is the implementation's and MUST be documented.
+
+Implementations operate in one of two modes. In **production mode** the testing codes (entity type `0xFF`, issuer `0xFFFFFF`) are rejected; in **test mode** they are accepted. An implementation MUST pass every vector in `test-vectors.json` that applies to its mode.
 
 ---
 
@@ -43,7 +45,7 @@ A conforming implementation accepts exactly the inputs this specification accept
 | Offset | Field | Size | Description |
 |--------|-------|------|-------------|
 | 0 | **Version** | 1 byte | BMID format version. See *Version Registry*. |
-| 1 | **Entity Type** | 1 byte | LRM entity class. See *Entity Type Registry*. |
+| 1 | **Entity Type** | 1 byte | Entity class. See *Entity Type Registry*. |
 | 2–4 | **Issuer ID** | 3 bytes | Organization that minted the identifier, big-endian. See *Issuer Registry*. |
 | 5–6 | **Reserved** | 2 bytes | MUST be all zero in version 1. Headroom for future versions. |
 | 7–22 | **UUID Payload** | 16 bytes | An RFC 9562 UUID. UUIDv7 RECOMMENDED for new mints. |
@@ -121,7 +123,7 @@ https://id.bmid.example/041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10F
 
 *[To be decided: the host is a domain owned by the consortium, fixed by this specification once chosen.]*
 
-Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is specified in a companion document. The issuer ID identifies the organization whose resolver is authoritative for an identifier. Because version, entity type, and issuer occupy exactly the first eight characters, the consortium host can route every request on that prefix, so a client needs one host regardless of how many issuers exist.
+Two IRIs denote the same entity if and only if their path segments are the same canonical form. Resolution behaviour is to be specified in a companion document. *[To be decided: the companion document has not been written.]* The issuer ID identifies the organization whose resolver is authoritative for an identifier, until the registry records a successor (see *Governance*). Because version, entity type, and issuer occupy exactly the first eight characters, the consortium host can route every request on that prefix, so a client needs one host regardless of how many issuers exist.
 
 ---
 
@@ -169,9 +171,9 @@ There is exactly one BMID registry. A code means the same thing in every system 
 | `0x08` | **Place** | A geographic or other place (LRM-E10). |
 | `0x09–0x7F` | *Reserved* | Future core types defined by this specification. |
 | `0x80–0xFE` | *Available* | Registry-assigned extension types. |
-| `0xFF` | *Reserved* | Testing and examples. SHOULD be rejected outside test contexts. |
+| `0xFF` | *Reserved* | Testing and examples. MUST be rejected in production mode (see *Conformance*). |
 
-The types follow IFLA LRM, with RDA as the reference for how its entities are applied in cataloguing, and each maps onto a BIBFRAME class (see *Alignment*). ONIX is accommodated through the mappings in *Carrying BMIDs in Existing Formats*; where ONIX and LRM differ, LRM decides the type. There are two deliberate departures. **Series** gets its own code although LRM and RDA model a series as an aggregating Work, because series are maintained and looked up independently in practice, and ONIX carries them in their own `<Collection>` composite rather than as works. **Person and Collective Agent** share a code because they are typically held in one authority file.
+The types follow IFLA LRM, with RDA as the reference for how its entities are applied in cataloguing, and each maps onto a BIBFRAME class (see *Alignment*). ONIX is accommodated through the mappings in *Carrying BMIDs in Existing Formats*; where ONIX and LRM differ, LRM decides the type. There are three deliberate departures. **Series** gets its own code although LRM models a series as an aggregating Work and RDA as a diachronic Work, because series are maintained and looked up independently in practice, and ONIX carries them in their own `<Collection>` composite rather than as works. **Topic** gets a code although LRM has no subject entity, only a subject relationship whose object may be any res, because subject vocabularies are maintained and looked up independently. **Person and Collective Agent** share a code because they are typically held in one authority file.
 
 **Classification follows this registry, not the issuer's internal model.** Issuers MUST assign the type defined here. A series MUST be minted as Series, never as Work, even where the issuer's own system holds it as a Work. Being a subject is a relationship, not a type: a Work, Agent, or Place that is the subject of a Work keeps its own type, and Topic is used only for concepts that are not one of the other types.
 
@@ -184,7 +186,7 @@ The types follow IFLA LRM, with RDA as the reference for how its entities are ap
 | Manifestation | Manifestation (E4) | Manifestation | `bf:Instance` |
 | Item | Item (E5) | Item | `bf:Item` |
 | Agent | Agent (E6): Person (E7), Collective Agent (E8) | Agent: Person, Family, Corporate Body | `bf:Agent`: `bf:Person`, `bf:Family`, `bf:Organization`, `bf:Meeting`, `bf:Jurisdiction` |
-| Series | Aggregating Work (E2) | Diachronic Work | `bf:Work`, linked to its member Works by `bf:hasSeries` and `bf:seriesOf` |
+| Series | Aggregating Work (E2); LRM gives a monographic series as an example | Diachronic Work (successive indeterminate work) | `bf:Series`, a subclass of `bf:Work`, linked to its members by `bf:hasSeries` and `bf:seriesOf` |
 | Topic | Res (E1), as the object of a subject relationship | No entity; the object of a subject relationship | `bf:Topic` |
 | Place | Place (E10) | Place | `bf:Place` |
 
@@ -202,7 +204,7 @@ Subclasses in the right-hand columns (Person versus Organization, for example) a
 |------|--------|
 | `0x000000` | *Reserved — invalid.* MUST be rejected. |
 | `0x000001–0xFFFFFE` | *Available — registry-assigned.* |
-| `0xFFFFFF` | *Reserved for testing and examples.* SHOULD be rejected outside test contexts. |
+| `0xFFFFFF` | *Reserved for testing and examples.* MUST be rejected in production mode (see *Conformance*). |
 
 (No partner organizations are allocated in this draft.)
 
@@ -240,7 +242,7 @@ Before validation, implementations MUST, in order:
 4. Fold to uppercase.
 5. Map `I` → `1`, `L` → `1`, and `O` → `0`.
 
-Any remaining character outside the alphabet — including interior whitespace — MUST cause rejection. Normalization applies to input only; the canonical form never contains lowercase letters, hyphens, a URN prefix, or the mapped characters.
+Any remaining character outside the alphabet — including interior whitespace — MUST cause rejection. Only the ASCII hyphen is stripped: other dash characters, such as U+2010 HYPHEN, U+2011 NON-BREAKING HYPHEN, and U+2013 EN DASH, are outside the alphabet and cause rejection. Normalization applies to input only; the canonical form never contains lowercase letters, hyphens, a URN prefix, or the mapped characters.
 
 ### Sort Order
 
@@ -291,7 +293,7 @@ Three storage strategies are conformant. In all of them, the canonical string is
 
 1. **Binary (25 bytes).** Most compact. Suitable for primary keys and binary protocols.
 2. **Canonical string (40 characters).** For APIs, logs, URLs, and display. Columns MUST use a binary collation (see *Sort Order*).
-3. **Decomposed.** A BMID is a pure function of (version, entity type, issuer, UUID). A system keyed by UUID keeps that key, adds entity type and issuer as two small columns, and computes the BMID at its boundary. Reserved and check bytes need not be stored. This is the RECOMMENDED path for wrapped legacy identifiers.
+3. **Decomposed.** A BMID is a pure function of (version, entity type, issuer, UUID). A system keyed by UUID keeps that key, adds entity type and issuer as two small columns, and computes the BMID at its boundary. Reserved and check bytes need not be stored. The version is implied: the decomposed form defined here is version 1, and a system that stores decomposed identifiers of more than one version MUST store the version as well. This is the RECOMMENDED path for wrapped legacy identifiers.
 
 In the decomposed form the issuer column is part of the identity and MUST be stored for every record, never inferred from the system's own identity: a wrapped identifier keeps the issuer that minted the wrap even after the record changes hands.
 
@@ -307,14 +309,16 @@ A conforming implementation MUST validate the following on input, in this order:
 2. **Character set:** every character MUST be in the [Crockford Base32](#crockford-base32) alphabet. Otherwise reject.
 3. **CRC:** decode, recompute CRC-16/XMODEM over bytes 0–22, and compare to bytes 23–24. On mismatch, reject.
 4. **Version:** byte 0 MUST be a version this implementation understands. A version 1 implementation accepts only `0x01`; `0x00` and `0x02–0xFF` MUST be rejected.
-5. **Entity type:** byte 1 MUST NOT be `0x00`. `0xFF` SHOULD be rejected outside test contexts. Reserved or unallocated codes MAY be accepted, optionally with a warning, so that newly registered types are not rejected by older consumers.
-6. **Issuer ID:** bytes 2–4, read as a big-endian integer, MUST NOT be `0x000000`. `0xFFFFFF` SHOULD be rejected outside test contexts. Unallocated codes MAY be accepted, optionally with a warning.
+5. **Entity type:** byte 1 MUST NOT be `0x00`. `0xFF` MUST be rejected in production mode. Reserved or unallocated codes MAY be accepted, optionally with a warning, so that newly registered types are not rejected by older consumers.
+6. **Issuer ID:** bytes 2–4, read as a big-endian integer, MUST NOT be `0x000000`. `0xFFFFFF` MUST be rejected in production mode. Unallocated codes MAY be accepted, optionally with a warning.
 7. **Reserved bytes:** bytes 5–6 MUST both be `0x00`. Otherwise reject. A future version that assigns meaning to these bytes changes the version byte.
 8. **UUID version and variant:** the two most significant bits of byte 15 (byte 8 of the payload) MUST be `10`, and the high nibble of byte 13 (byte 6 of the payload) MUST be `0x1`–`0x8`. Otherwise reject. This is a structural check only; it does not require v7.
 
-Steps 1–3 depend only on the invariants, never on the version byte. A production system SHOULD reject the testing codes (`0xFF` in step 5, `0xFFFFFF` in step 6); a test suite accepts them.
+Steps 1–3 depend only on the invariants, never on the version byte. An implementation in production mode rejects the testing codes (`0xFF` in step 5, `0xFFFFFF` in step 6); one in test mode accepts them (see *Conformance*).
 
-### Revocation and Deprecation
+---
+
+## Revocation and Deprecation
 
 BMIDs are **never reused or reassigned.** When an entity is withdrawn, merged, re-typed, or otherwise deprecated, its record is marked deprecated and carries a pointer to the successor BMID, if any. The identifier remains valid as a historical reference and continues to resolve to its deprecation record.
 
@@ -358,14 +362,14 @@ BMID requires no new message formats. In every case below the value carried is t
 |--------|-------|-----|
 | Manifestation | `<ProductIdentifier>` | `<ProductIDType>` 01 (proprietary), `<IDTypeName>` `BMID`, `<IDValue>` the BMID |
 | Work | `<RelatedWork>` with `<WorkRelationCode>` 01 (manifestation of) or 06 (manifestation of original work); 29 (derived from via translation) for the original of a translation. `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
-| Expression (translation) | `<RelatedWork>` with `<WorkRelationCode>` 01, `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Expression (translation, abridgement, revision, or other derivation) | `<RelatedWork>` with `<WorkRelationCode>` 01, `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Series | `<Collection>`, `<CollectionIdentifier>` | `<CollectionIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (contributor) | `<Contributor>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (publisher) | `<Publisher>`, `<PublisherIdentifier>` | `<PublisherIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (imprint) | `<Imprint>`, `<ImprintIdentifier>` | `<ImprintIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (subject of the book) | `<NameAsSubject>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Topic, Place (subject of the book) | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
-| Other Expressions, Item, Place (other roles) | — | No natural ONIX home. ONIX describes products, not copies, and place of publication is carried as text or a country code. |
+| Expression (other), Item, Place (other roles) | — | No natural ONIX home. ONIX describes products, not expressions or copies, and place of publication is carried as text or a country code. |
 
 The `<IDTypeName>` and `<SubjectSchemeName>` value is the fixed token `BMID`, per EDItEUR's guidance for proprietary identifiers (*Identifiers in ONIX*, 2025).
 
@@ -377,7 +381,7 @@ Field `024` with first indicator `7`, `$a` the BMID, and `$2` a source code for 
 
 ### RDF and BIBFRAME
 
-Use the HTTP IRI form as the resource IRI, or attach it via `bf:identifiedBy` with an identifier resource whose value is the canonical string. The URN form MAY be used where an IRI is required but resolution is not.
+Use the HTTP IRI form as the resource IRI, or attach it via `bf:identifiedBy` with an identifier resource whose value is the canonical string. The URN form can be used where an IRI is required but resolution is not.
 
 Each BMID type maps to the BIBFRAME class given in *Alignment*. BIBFRAME has no Expression class, so an Expression is carried as a `bf:Work` linked to the `bf:Work` of its Work by `bf:expressionOf`; when importing BIBFRAME, a `bf:Work` with such a link is minted as an Expression. A Series is carried as a `bf:Work` linked to its members by `bf:hasSeries` and `bf:seriesOf`.
 
@@ -407,8 +411,9 @@ Carry the canonical string. Never carry the binary form in JSON.
 - **Owner.** *[To be decided: the consortium body or lead organization that owns this specification and its registries.]*
 - **Registry maintenance.** This repository is the registry. Allocation requests are pull requests against this document. *[To be decided: the maintainers who review them, and the review period.]*
 - **Issuer allocation criteria.** The requesting organization maintains entity records on its own authority, operates or contracts a resolver endpoint for the identifiers it mints, provides an organizational contact, and agrees to the wrap-once rule and to never reusing an identifier. Organizations that do not meet these criteria mint through an existing issuer (see *Scope*).
+- **Issuer succession.** When an issuer merges with or is acquired by another organization, the successor answers resolution requests for every issuer code it inherits, and the registry records the successor against each inherited code. Inherited codes are never reused; the successor may continue minting under them or under its own code. *[To be decided: resolution for the codes of an issuer that ceases operating without a successor. The consortium host, which already routes on the issuer prefix, is the natural fallback.]*
 - **Entity type allocation criteria.** As stated in *Entity Type Registry*.
-- **Change policy.** Registries are append-only. A change to any normative section that alters which inputs are accepted, or what they mean, is a new version and takes a new version byte. Editorial changes and additions to informative sections do not.
+- **Change policy.** Registries are append-only. A change to any normative section that alters which inputs are accepted, or what they mean, is a new version and takes a new version byte. Editorial changes and additions to informative sections do not. This policy applies from v1.0 final; while this specification is a draft, breaking changes are made in place and recorded in the *Changelog*.
 - **License.** *[To be decided. CC BY 4.0 for this document and Apache-2.0 or MIT for reference code are the conventional choices.]*
 
 ---
@@ -417,7 +422,7 @@ Carry the canonical string. Never carry the binary form in JSON.
 
 The check bytes detect errors, not tampering. Where cryptographic integrity is required, layer HMAC or signatures over the BMID rather than extending it.
 
-The issuer ID is informational and MUST NOT be used as an access control mechanism. It also discloses the original minter, which may be commercially sensitive; partners exposing BMIDs externally should consider whether that is acceptable.
+The issuer ID is informational and is not an access control mechanism. It also discloses the original minter, which may be commercially sensitive; partners exposing BMIDs externally should consider whether that is acceptable.
 
 A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payloads disclose whatever their original version encodes; a v1 UUID embeds a timestamp and historically a MAC address.
 
@@ -432,6 +437,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-30** — Review fixes. Defined production and test conformance modes and made rejection of the testing codes a MUST in production mode. Moved *Revocation and Deprecation* to its own normative section. Removed RFC 2119 keywords from informative sections. Added issuer succession on merger to *Governance* and stated that the change policy applies from v1.0 final. Tied the decomposed storage form to version 1. Stated that only the ASCII hyphen is stripped in normalization. Reworded *Scope* on standard identifiers. Corrected the RDA and BIBFRAME columns for Series (`bf:Series`) and listed Topic as a third departure from LRM. Added test vectors for Expression, Item, Series, a non-zero byte 5, and an en dash.
 - **2026-10-30** — Removed ISTC from the identifiers BMID does not replace, since ISO 21047 was withdrawn in 2021, and noted that Works and Expressions have no active standard identifier. No change to the byte layout or validation.
 - **2026-10-30** — Aligned the ONIX mapping with the entity types: corrected the publisher and imprint elements, added Agents, Topics, and Places as subjects, and specified how translations map to ONIX work relation codes. Stated that LRM decides the type where ONIX differs. No change to the byte layout or validation.
 - **2026-10-30** — Aligned the entity types with IFLA LRM and RDA, with a mapping to BIBFRAME. Renamed `0x07` from Subject to Topic and stated that being a subject is a relationship, not a type. Added Place as `0x08`. Kept Series as a documented departure from LRM and required issuers to classify by the registry rather than their internal model. Made LRM as applied by RDA the reference modeling profile. No change to the byte layout or validation.

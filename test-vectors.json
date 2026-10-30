@@ -1,7 +1,7 @@
 {
   "spec": "BMID v1.0 draft",
   "generated": "2026-10-30",
-  "description": "Conformance vectors. 'valid' inputs must be accepted and decode to the listed fields. 'normalization' inputs must normalize to the listed canonical form. 'invalid' inputs must be rejected at the listed validation step. 'test_context_only' inputs are accepted only when testing codes (entity type 0xFF, issuer 0xFFFFFF) are allowed.",
+  "description": "Conformance vectors. 'valid' inputs must be accepted and decode to the listed fields. 'normalization' inputs must normalize to the listed canonical form. 'invalid' inputs must be rejected at the listed validation step. 'test_context_only' inputs are accepted in test mode and rejected in production mode (testing codes: entity type 0xFF, issuer 0xFFFFFF).",
   "crc16_xmodem": {
     "input": "123456789",
     "crc": "31C3"
@@ -66,6 +66,42 @@
       "uuid_version": 7,
       "crc": "319B",
       "note": "Place, unallocated issuer 0x000001, UUIDv7."
+    },
+    {
+      "input": "04100001000036HV3HYJWZT1HMH3PK2XDSZR0QQ1",
+      "canonical": "04100001000036HV3HYJWZT1HMH3PK2XDSZR0QQ1",
+      "bytes": "01020000010000019A3B1C7D2E7F418D223B4C5D6E7F805EE1",
+      "version": 1,
+      "entity_type": 2,
+      "issuer": 1,
+      "uuid": "019a3b1c-7d2e-7f41-8d22-3b4c5d6e7f80",
+      "uuid_version": 7,
+      "crc": "5EE1",
+      "note": "Expression, unallocated issuer 0x000001, UUIDv7."
+    },
+    {
+      "input": "04200001000036HV3HYJWZT2KRSMRQBEFY09356G",
+      "canonical": "04200001000036HV3HYJWZT2KRSMRQBEFY09356G",
+      "bytes": "01040000010000019A3B1C7D2E7F429E334C5D6E7F809194D0",
+      "version": 1,
+      "entity_type": 4,
+      "issuer": 1,
+      "uuid": "019a3b1c-7d2e-7f42-9e33-4c5d6e7f8091",
+      "uuid_version": 7,
+      "crc": "94D0",
+      "note": "Item, unallocated issuer 0x000001, UUIDv7."
+    },
+    {
+      "input": "04300001000036HV3HYJWZT3NX25TVKZG28T44BK",
+      "canonical": "04300001000036HV3HYJWZT3NX25TVKZG28T44BK",
+      "bytes": "01060000010000019A3B1C7D2E7F43AF445D6E7F8091A21173",
+      "version": 1,
+      "entity_type": 6,
+      "issuer": 1,
+      "uuid": "019a3b1c-7d2e-7f43-af44-5d6e7f8091a2",
+      "uuid_version": 7,
+      "crc": "1173",
+      "note": "Series, unallocated issuer 0x000001, UUIDv7."
     },
     {
       "input": "060FZZZY000034GA7WF5RZ9YH8DJRFAEBXG72JHT",
@@ -160,6 +196,12 @@
       "note": "Interior whitespace is not stripped and is not a valid character."
     },
     {
+      "input": "041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10–",
+      "step": 2,
+      "reason": "charset",
+      "note": "U+2013 EN DASH is not stripped; only the ASCII hyphen is."
+    },
+    {
       "input": "041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q100",
       "step": 3,
       "reason": "crc",
@@ -196,10 +238,16 @@
       "note": "Issuer 0x000000."
     },
     {
+      "input": "041ZZZZZ040033SD9A600W93K8NKRKAYDXX8PX1Y",
+      "step": 7,
+      "reason": "reserved",
+      "note": "Non-zero reserved byte 5 with a valid CRC."
+    },
+    {
       "input": "041ZZZZZ000G33SD9A600W93K8NKRKAYDXX8Q57D",
       "step": 7,
       "reason": "reserved",
-      "note": "Non-zero reserved byte with a valid CRC."
+      "note": "Non-zero reserved byte 6 with a valid CRC."
     },
     {
       "input": "041ZZZZZ00000000000000000000000000000KE1",
@@ -241,11 +289,11 @@
   "test_context_only": [
     {
       "input": "041ZZZZZ000033SD9A600W93K8NKRKAYDXX8Q10F",
-      "note": "Issuer 0xFFFFFF is accepted in a test context and SHOULD be rejected in production (step 6)."
+      "note": "Issuer 0xFFFFFF is accepted in test mode and rejected in production mode (step 6)."
     },
     {
       "input": "07ZG0001000033SD9A600W93K8NKRKAYDXX8Q1BM",
-      "note": "Entity type 0xFF is accepted in a test context and SHOULD be rejected in production (step 5)."
+      "note": "Entity type 0xFF is accepted in test mode and rejected in production mode (step 5)."
     }
   ]
 }
