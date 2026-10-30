@@ -169,7 +169,7 @@ There is exactly one BMID registry. A code means the same thing in every system 
 | `0x80–0xFE` | *Available* | Registry-assigned extension types. |
 | `0xFF` | *Reserved* | Testing and examples. SHOULD be rejected outside test contexts. |
 
-The types follow IFLA LRM, with RDA as the reference for how its entities are applied in cataloguing, and each maps onto a BIBFRAME class (see *Alignment*). There are two deliberate departures. **Series** gets its own code although LRM and RDA model a series as an aggregating Work, because series are maintained and looked up independently in practice. **Person and Collective Agent** share a code because they are typically held in one authority file.
+The types follow IFLA LRM, with RDA as the reference for how its entities are applied in cataloguing, and each maps onto a BIBFRAME class (see *Alignment*). ONIX is accommodated through the mappings in *Carrying BMIDs in Existing Formats*; where ONIX and LRM differ, LRM decides the type. There are two deliberate departures. **Series** gets its own code although LRM and RDA model a series as an aggregating Work, because series are maintained and looked up independently in practice, and ONIX carries them in their own `<Collection>` composite rather than as works. **Person and Collective Agent** share a code because they are typically held in one authority file.
 
 **Classification follows this registry, not the issuer's internal model.** Issuers MUST assign the type defined here. A series MUST be minted as Series, never as Work, even where the issuer's own system holds it as a Work. Being a subject is a relationship, not a type: a Work, Agent, or Place that is the subject of a Work keeps its own type, and Topic is used only for concepts that are not one of the other types.
 
@@ -355,15 +355,19 @@ BMID requires no new message formats. In every case below the value carried is t
 | Entity | Where | How |
 |--------|-------|-----|
 | Manifestation | `<ProductIdentifier>` | `<ProductIDType>` 01 (proprietary), `<IDTypeName>` `BMID`, `<IDValue>` the BMID |
-| Work | `<RelatedWork>` with `<WorkRelationCode>` 01 (manifestation of), `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Work | `<RelatedWork>` with `<WorkRelationCode>` 01 (manifestation of) or 06 (manifestation of original work); 29 (derived from via translation) for the original of a translation. `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Expression (translation) | `<RelatedWork>` with `<WorkRelationCode>` 01, `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Series | `<Collection>`, `<CollectionIdentifier>` | `<CollectionIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (contributor) | `<Contributor>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (publisher) | `<Publisher>`, `<PublisherIdentifier>` | `<PublisherIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (imprint) | `<Imprint>`, `<ImprintIdentifier>` | `<ImprintIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
-| Topic | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
-| Expression, Item | — | No natural ONIX home; ONIX describes products, not expressions or copies. |
+| Agent (subject of the book) | `<NameAsSubject>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Topic, Place (subject of the book) | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
+| Other Expressions, Item, Place (other roles) | — | No natural ONIX home. ONIX describes products, not copies, and place of publication is carried as text or a country code. |
 
 The `<IDTypeName>` and `<SubjectSchemeName>` value is the fixed token `BMID`, per EDItEUR's guidance for proprietary identifiers (*Identifiers in ONIX*, 2025).
+
+**Translations and other derivations.** ONIX work relations follow the former ISTC rules, in which a translation is a work derived from the original. Under the reference profile, that derived work is a BMID Expression of the original Work. For a translated product, send the original Work's BMID with code 29 and, optionally, the translation's Expression BMID with code 01. For an untranslated product, send the Work's BMID with code 01, or 06 where it is known to be original. The other derivation codes (21–31) follow the same pattern where LRM treats the result as a new Expression, as for abridgement or revision; where LRM treats it as a new Work, as for adaptation into another form, send that Work's BMID with code 01.
 
 ### MARC 21
 
@@ -426,6 +430,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-30** — Aligned the ONIX mapping with the entity types: corrected the publisher and imprint elements, added Agents, Topics, and Places as subjects, and specified how translations map to ONIX work relation codes. Stated that LRM decides the type where ONIX differs. No change to the byte layout or validation.
 - **2026-10-30** — Aligned the entity types with IFLA LRM and RDA, with a mapping to BIBFRAME. Renamed `0x07` from Subject to Topic and stated that being a subject is a relationship, not a type. Added Place as `0x08`. Kept Series as a documented departure from LRM and required issuers to classify by the registry rather than their internal model. Made LRM as applied by RDA the reference modeling profile. No change to the byte layout or validation.
 - **2026-10-29** — Stated that modeling practice, such as translation-as-Work, is not grounds for a new entity type, and added an optional modeling profile to issuer registry entries. No change to the byte layout or validation.
 - **2026-10-27** — Added delegated minting: organizations without an issuer code mint through an existing issuer. Publishers may now hold issuer codes. Issuers must operate or contract a resolver endpoint, and the consortium host routes on the eight-character prefix. No change to the byte layout or validation.
