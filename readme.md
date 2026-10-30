@@ -358,7 +358,8 @@ BMID requires no new message formats. In every case below the value carried is t
 | Work | `<RelatedWork>` with `<WorkRelationCode>` 01 (manifestation of), `<WorkIdentifier>` | `<WorkIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Series | `<Collection>`, `<CollectionIdentifier>` | `<CollectionIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (contributor) | `<Contributor>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
-| Agent (publisher, imprint) | `<Publisher>` or `<Imprint>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Agent (publisher) | `<Publisher>`, `<PublisherIdentifier>` | `<PublisherIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
+| Agent (imprint) | `<Imprint>`, `<ImprintIdentifier>` | `<ImprintIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Topic | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
 | Expression, Item | — | No natural ONIX home; ONIX describes products, not expressions or copies. |
 
