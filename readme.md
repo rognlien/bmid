@@ -16,7 +16,9 @@ BMID is designed for a consortium of partner organizations that independently mi
 
 ## Scope
 
-BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, Topics, and Places. It does not replace ISBN, ISTC, ISNI, or DOI; those are carried as parallel metadata.
+BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, Topics, and Places. It does not replace ISBN, ISNI, or DOI; those are carried as parallel metadata.
+
+Works and Expressions have no active standard identifier. The International Standard Text Code (ISTC, ISO 21047), which identified textual works, was withdrawn in 2021: its registration agency ceased operating, no successor was found, and existing registrations are no longer accessible. Legacy ISTCs MAY still be carried as parallel metadata where records hold them.
 
 BMIDs are minted by registered **issuers**: metadata aggregators, national bibliographic agencies, publishers, retailers, and similar organizations that maintain entity records on their own authority.
 
@@ -430,6 +432,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-30** — Removed ISTC from the identifiers BMID does not replace, since ISO 21047 was withdrawn in 2021, and noted that Works and Expressions have no active standard identifier. No change to the byte layout or validation.
 - **2026-10-30** — Aligned the ONIX mapping with the entity types: corrected the publisher and imprint elements, added Agents, Topics, and Places as subjects, and specified how translations map to ONIX work relation codes. Stated that LRM decides the type where ONIX differs. No change to the byte layout or validation.
 - **2026-10-30** — Aligned the entity types with IFLA LRM and RDA, with a mapping to BIBFRAME. Renamed `0x07` from Subject to Topic and stated that being a subject is a relationship, not a type. Added Place as `0x08`. Kept Series as a documented departure from LRM and required issuers to classify by the registry rather than their internal model. Made LRM as applied by RDA the reference modeling profile. No change to the byte layout or validation.
 - **2026-10-29** — Stated that modeling practice, such as translation-as-Work, is not grounds for a new entity type, and added an optional modeling profile to issuer registry entries. No change to the byte layout or validation.
