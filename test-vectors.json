@@ -1,6 +1,6 @@
 {
   "spec": "BMID v1.0 draft",
-  "generated": "2026-10-27",
+  "generated": "2026-10-30",
   "description": "Conformance vectors. 'valid' inputs must be accepted and decode to the listed fields. 'normalization' inputs must normalize to the listed canonical form. 'invalid' inputs must be rejected at the listed validation step. 'test_context_only' inputs are accepted only when testing codes (entity type 0xFF, issuer 0xFFFFFF) are allowed.",
   "crc16_xmodem": {
     "input": "123456789",
@@ -53,7 +53,19 @@
       "uuid": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
       "uuid_version": 1,
       "crc": "F9BB",
-      "note": "Subject, unallocated issuer 0x01E240 (all three issuer bytes significant), wrapped UUIDv1 payload. Structural check passes; no temporal ordering."
+      "note": "Topic, unallocated issuer 0x01E240 (all three issuer bytes significant), wrapped UUIDv1 payload. Structural check passes; no temporal ordering."
+    },
+    {
+      "input": "04400001000036HV3HYJWZT0KG8JMETCBNQ7YCCV",
+      "canonical": "04400001000036HV3HYJWZT0KG8JMETCBNQ7YCCV",
+      "bytes": "01080000010000019A3B1C7D2E7F409C112A3B4C5D6E7F319B",
+      "version": 1,
+      "entity_type": 8,
+      "issuer": 1,
+      "uuid": "019a3b1c-7d2e-7f40-9c11-2a3b4c5d6e7f",
+      "uuid_version": 7,
+      "crc": "319B",
+      "note": "Place, unallocated issuer 0x000001, UUIDv7."
     },
     {
       "input": "060FZZZY000034GA7WF5RZ9YH8DJRFAEBXG72JHT",

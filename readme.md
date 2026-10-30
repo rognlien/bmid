@@ -16,7 +16,7 @@ BMID is designed for a consortium of partner organizations that independently mi
 
 ## Scope
 
-BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, and Subjects. It does not replace ISBN, ISTC, ISNI, or DOI; those are carried as parallel metadata.
+BMID identifies entities that lack a standard identifier: Works, Expressions, Manifestations, Items, Agents, Series, Topics, and Places. It does not replace ISBN, ISTC, ISNI, or DOI; those are carried as parallel metadata.
 
 BMIDs are minted by registered **issuers**: metadata aggregators, national bibliographic agencies, publishers, retailers, and similar organizations that maintain entity records on their own authority.
 
@@ -162,13 +162,31 @@ There is exactly one BMID registry. A code means the same thing in every system 
 | `0x03` | **Manifestation** | A physical or digital embodiment (LRM-E4). |
 | `0x04` | **Item** | A specific exemplar of a Manifestation (LRM-E5). |
 | `0x05` | **Agent** | A person or collective agent (LRM-E6, covering E7 and E8), e.g. a contributor or publisher. |
-| `0x06` | **Series** | A collection of related Works, numbered or unnumbered. |
-| `0x07` | **Subject** | A topic, theme, or classification heading. |
-| `0x08–0x7F` | *Reserved* | Future core types defined by this specification. |
+| `0x06` | **Series** | A group of Works issued under a collective title, numbered or unnumbered. |
+| `0x07` | **Topic** | A concept used as a subject, such as a term or heading in a subject scheme. |
+| `0x08` | **Place** | A geographic or other place (LRM-E10). |
+| `0x09–0x7F` | *Reserved* | Future core types defined by this specification. |
 | `0x80–0xFE` | *Available* | Registry-assigned extension types. |
 | `0xFF` | *Reserved* | Testing and examples. SHOULD be rejected outside test contexts. |
 
-The list is pragmatic rather than a transcription of LRM. Series and Subject get their own codes because they are independently maintained and looked up in practice; Person and Collective Agent share a code because they are typically held in one authority file.
+The types follow IFLA LRM, with RDA as the reference for how its entities are applied in cataloguing, and each maps onto a BIBFRAME class (see *Alignment*). There are two deliberate departures. **Series** gets its own code although LRM and RDA model a series as an aggregating Work, because series are maintained and looked up independently in practice. **Person and Collective Agent** share a code because they are typically held in one authority file.
+
+**Classification follows this registry, not the issuer's internal model.** Issuers MUST assign the type defined here. A series MUST be minted as Series, never as Work, even where the issuer's own system holds it as a Work. Being a subject is a relationship, not a type: a Work, Agent, or Place that is the subject of a Work keeps its own type, and Topic is used only for concepts that are not one of the other types.
+
+#### Alignment
+
+| BMID type | IFLA LRM | RDA | BIBFRAME 2 |
+|-----------|----------|-----|------------|
+| Work | Work (E2) | Work | `bf:Work` |
+| Expression | Expression (E3) | Expression | `bf:Work` linked to its Work by `bf:expressionOf` |
+| Manifestation | Manifestation (E4) | Manifestation | `bf:Instance` |
+| Item | Item (E5) | Item | `bf:Item` |
+| Agent | Agent (E6): Person (E7), Collective Agent (E8) | Agent: Person, Family, Corporate Body | `bf:Agent`: `bf:Person`, `bf:Family`, `bf:Organization`, `bf:Meeting`, `bf:Jurisdiction` |
+| Series | Aggregating Work (E2) | Diachronic Work | `bf:Work`, linked to its member Works by `bf:hasSeries` and `bf:seriesOf` |
+| Topic | Res (E1), as the object of a subject relationship | No entity; the object of a subject relationship | `bf:Topic` |
+| Place | Place (E10) | Place | `bf:Place` |
+
+Subclasses in the right-hand columns (Person versus Organization, for example) are attributes of the record, not separate types.
 
 **Criterion for a new type.** A code is allocated for a class that is *independently resolvable*: it has its own records and its own lookup path. A distinction expressed as an attribute of an existing class (Person versus Collective Agent, print versus digital Manifestation) belongs in metadata, not in the type byte.
 
@@ -190,7 +208,7 @@ The issuer ID identifies the **minter** at the moment of creation. It is provena
 
 Because registries are append-only, the 16,777,214 assignable codes are a lifetime budget covering every allocation ever made.
 
-**Modeling profile.** An allocation request MAY state the issuer's modeling profile: how it draws entity boundaries where practice varies, for example whether a translation is a new Work or a new Expression of the original Work. The profile is recorded with the issuer's entry, dated, and updated by pull request when the issuer's practice changes. It describes the issuer's records and does not change the meaning of any entity type; individual records MAY state a different practice in their metadata.
+**Modeling profile.** An allocation request MAY state the issuer's modeling profile: how it draws entity boundaries where practice varies, for example whether a translation is a new Work or a new Expression of the original Work. The profile is recorded with the issuer's entry, dated, and updated by pull request when the issuer's practice changes. It describes the issuer's records and does not change the meaning of any entity type; individual records MAY state a different practice in their metadata. The reference profile is IFLA LRM as applied by RDA: a translation is a new Expression of the original Work. Consumers assume the reference profile for an issuer that states none.
 
 ---
 
@@ -341,7 +359,7 @@ BMID requires no new message formats. In every case below the value carried is t
 | Series | `<Collection>`, `<CollectionIdentifier>` | `<CollectionIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (contributor) | `<Contributor>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
 | Agent (publisher, imprint) | `<Publisher>` or `<Imprint>`, `<NameIdentifier>` | `<NameIDType>` 01 (proprietary), `<IDTypeName>` `BMID` |
-| Subject | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
+| Topic | `<Subject>` | `<SubjectSchemeIdentifier>` 24 (proprietary), `<SubjectSchemeName>` `BMID`, `<SubjectCode>` the BMID |
 | Expression, Item | — | No natural ONIX home; ONIX describes products, not expressions or copies. |
 
 The `<IDTypeName>` and `<SubjectSchemeName>` value is the fixed token `BMID`, per EDItEUR's guidance for proprietary identifiers (*Identifiers in ONIX*, 2025).
@@ -353,6 +371,8 @@ Field `024` with first indicator `7`, `$a` the BMID, and `$2` a source code for 
 ### RDF and BIBFRAME
 
 Use the HTTP IRI form as the resource IRI, or attach it via `bf:identifiedBy` with an identifier resource whose value is the canonical string. The URN form MAY be used where an IRI is required but resolution is not.
+
+Each BMID type maps to the BIBFRAME class given in *Alignment*. BIBFRAME has no Expression class, so an Expression is carried as a `bf:Work` linked to the `bf:Work` of its Work by `bf:expressionOf`; when importing BIBFRAME, a `bf:Work` with such a link is minted as an Expression. A Series is carried as a `bf:Work` linked to its members by `bf:hasSeries` and `bf:seriesOf`.
 
 ### JSON and other APIs
 
@@ -405,6 +425,7 @@ A UUIDv7 payload discloses the mint time to the millisecond. Wrapped legacy payl
 
 ## Changelog
 
+- **2026-10-30** — Aligned the entity types with IFLA LRM and RDA, with a mapping to BIBFRAME. Renamed `0x07` from Subject to Topic and stated that being a subject is a relationship, not a type. Added Place as `0x08`. Kept Series as a documented departure from LRM and required issuers to classify by the registry rather than their internal model. Made LRM as applied by RDA the reference modeling profile. No change to the byte layout or validation.
 - **2026-10-29** — Stated that modeling practice, such as translation-as-Work, is not grounds for a new entity type, and added an optional modeling profile to issuer registry entries. No change to the byte layout or validation.
 - **2026-10-27** — Added delegated minting: organizations without an issuer code mint through an existing issuer. Publishers may now hold issuer codes. Issuers must operate or contract a resolver endpoint, and the consortium host routes on the eight-character prefix. No change to the byte layout or validation.
 - **2026-10-27** — Widened the Issuer ID from 1 to 3 bytes (offsets 2–4, big-endian), raising the lifetime budget from 254 to 16,777,214 codes; the testing issuer is now `0xFFFFFF`. The reserved block shrinks to bytes 5–6, and the first eight characters now encode exactly version, entity type, and issuer. Worked examples and `test-vectors.json` regenerated. Breaking change to the draft layout; no issuers were allocated.

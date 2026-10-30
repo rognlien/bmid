@@ -52,7 +52,7 @@
 "use strict";
 
 const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
+const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Topic", 8: "Place" };
 
 // Spec "Input Normalization": trim outer whitespace, strip hyphens, fold case,
 // map I/L to 1 and O to 0. Interior whitespace is NOT stripped — it falls
@@ -167,7 +167,7 @@ inputEl.addEventListener("keydown", e => { if (e.key === "Enter") runDecode(); }
 
 const bookmarkletSource = `(function () {
   const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Subject" };
+  const TYPES = { 1: "Work", 2: "Expression", 3: "Manifestation", 4: "Item", 5: "Agent", 6: "Series", 7: "Topic", 8: "Place" };
 
   function normalize(s) {
     return s.trim()
